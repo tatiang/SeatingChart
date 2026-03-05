@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seating Chart Builder</title>
+
+<!-- React + Babel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<!-- Firebase SDK (compat v10) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<!-- ── Firebase config ────────────────────────────────────────────────────────
+     SETUP STEPS:
+     1. Go to https://console.firebase.google.com
+     2. Create a project (e.g. "seating-chart")
+     3. Add a Web app → copy the firebaseConfig values below
+     4. In Authentication → Sign-in method → enable Google
+     5. In Firestore Database → Create database (production mode)
+     6. In Firestore → Rules → paste the rules from README.md
+     ──────────────────────────────────────────────────────────────────────── -->
+<script>
+window.FB_CONFIG = {
+  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
+  authDomain:        "REPLACE_WITH_YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
+  storageBucket:     "REPLACE_WITH_YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "REPLACE_WITH_YOUR_SENDER_ID",
+  appId:             "REPLACE_WITH_YOUR_APP_ID"
+};
+
+// Initialize only when config has been filled in
+window.FB_READY = !window.FB_CONFIG.apiKey.startsWith('REPLACE');
+if (window.FB_READY) {
+  firebase.initializeApp(window.FB_CONFIG);
+  window.fbAuth = firebase.auth();
+  window.fbDb   = firebase.firestore();
+  const p = new firebase.auth.GoogleAuthProvider();
+  // Hint Google to use the school domain — user can still pick any account
+  p.setCustomParameters({ hd: 'markdayschool.org' });
+  window.gProvider = p;
+}
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#cdd5df;}
+input,select,textarea,button{font-family:inherit;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:10px;}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 15px;
+  border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;
+  transition:all .14s;white-space:nowrap;line-height:1;}
+.btn:active{transform:scale(.96);}
+.btn-primary{background:#2563eb;color:#fff;box-shadow:0 1px 4px rgba(37,99,235,.35);}
+.btn-primary:hover{background:#1d4ed8;}
+.btn-primary:disabled{background:#93c5fd;cursor:default;transform:none;box-shadow:none;}
+.btn-success{background:#16a34a;color:#fff;}
+.btn-success:hover{background:#15803d;}
+.btn-ghost{background:#fff;color:#475569;border:1px solid #e2e8f0;}
+.btn-ghost:hover{background:#f1f5f9;}
+.btn-ghost:disabled{opacity:.4;cursor:default;transform:none;}
+.btn-red{background:#fee2e2;color:#dc2626;border:1px solid #fecaca;}
+.btn-red:hover{background:#fecaca;}
+.btn-shuffle{background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;
+  font-size:15px;font-weight:800;padding:10px 22px;border-radius:9px;
+  box-shadow:0 3px 12px rgba(239,68,68,.4);letter-spacing:.3px;}
+.btn-shuffle:hover{box-shadow:0 5px 18px rgba(239,68,68,.5);transform:translateY(-1px);}
+
+/* Inputs */
+.input{width:100%;padding:8px 11px;border:1.5px solid #e2e8f0;border-radius:7px;
+  font-size:13px;outline:none;transition:border .14s,box-shadow .14s;background:#fff;color:#0f172a;}
+.input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.14);}
+textarea.input{resize:vertical;}
+
+/* Tags */
+.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;}
+.tag-M{background:#dbeafe;color:#1e40af;}
+.tag-F{background:#fce7f3;color:#9d174d;}
+.tag-NB{background:#f3effe;color:#7c3aed;}
+.tag-X{background:#f1f5f9;color:#64748b;}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,20,40,.6);z-index:2000;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.modal{background:#fff;border-radius:14px;padding:26px;min-width:420px;max-width:640px;
+  max-height:88vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.3);}
+.section-lbl{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.9px;color:#94a3b8;margin-bottom:7px;}
+
+@media print{
+  .no-print{display:none!important;}
+  body{overflow:visible;height:auto;background:#fff;}
+  .print-hdr{display:block!important;}
+}
+.print-hdr{display:none;}
+
+/* Fullscreen overlay controls */
+.fs-hud{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  background:rgba(10,20,40,.75);border-radius:14px;padding:12px 20px;
+  display:flex;gap:14px;align-items:center;z-index:500;
+  backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+// ── Room model ─────────────────────────────────────────────────────────────────
+// All coordinates stored in "room pixels" at BASE_SCALE (20px/ft)
+// Visual rendering uses CSS transform:scale(roomScale)
+const BASE = 20; // px per foot in storage
+const RW=40, RH=20;
+const PW=RW*BASE, PH=RH*BASE; // 800×400 — storage coordinate space
+const SCR_W=10*BASE, SCR_H=1.2*BASE; // 200×24
+
+// Table dims (vertical orientation, storage coords)
+const TDIMS={sm:{w:50,h:100},md:{w:70,h:140},lg:{w:90,h:180}};
+const tw=(orient,size)=>orient==='V'?TDIMS[size||'sm'].w:TDIMS[size||'sm'].h;
+const th=(orient,size)=>orient==='V'?TDIMS[size||'sm'].h:TDIMS[size||'sm'].w;
+
+const TCOLORS=['#3b82f6','#10b981','#f97316','#8b5cf6','#ef4444','#06b6d4','#f59e0b','#64748b'];
+const TDARKS =['#1d4ed8','#059669','#c2410c','#7c3aed','#b91c1c','#0891b2','#d97706','#334155'];
+const GCOLOR ={M:'#3b82f6',F:'#ec4899',NB:'#8b5cf6',X:'#8b5cf6'};
+
+const STORAGE='seatplan-v7';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const shuffle=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
+const fmt=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+
+// Firebase handles (set by the config script above)
+const FB_READY  = window.FB_READY  || false;
+const fbAuth    = window.fbAuth    || null;
+const fbDb      = window.fbDb      || null;
+const gProvider = window.gProvider || null;
+
+// ── Auto-layout (recalculates positions, returns only x/y) ─────────────────────
+function tablePositions(n,size){
+  if(!n)return[];
+  const{w,h}=TDIMS[size||'sm'];
+  const cols=n<=2?n:n<=4?2:n<=6?3:4;
+  const rows=Math.ceil(n/cols);
+  const gapX=w+28, gapY=h+28;
+  const gridW=(cols-1)*gapX, gridH=(rows-1)*gapY;
+  const ox=PW/2-gridW/2, oy=PH*0.44-gridH/2;
+  return Array.from({length:n},(_,i)=>{
+    const c=i%cols,r=Math.floor(i/cols);
+    return{
+      x:Math.max(4,Math.min(PW-w-4, ox+c*gapX-w/2)),
+      y:Math.max(SCR_H+20,Math.min(PH-h-4, oy+r*gapY-h/2))};
+  });
+}
+
+// ── Class factory ──────────────────────────────────────────────────────────────
+function mkClass(name){
+  const pos=tablePositions(4,'sm');
+  return{id:uid(),name,students:[],tableSize:'sm',
+    tables:pos.map((p,i)=>({id:uid(),label:`Table ${i+1}`,orientation:'V',...p})),
+    screen:{x:PW/2-SCR_W/2,y:8,orientation:'H'},
+    seatingHistory:[],currentAssignment:null,
+    constraints:{genderMode:'mixed',excludedStudents:[],keepApart:[],groupSize:4}};
+}
+
+// ── Assignment algorithm ───────────────────────────────────────────────────────
+function generateAssignment(cls){
+  const{students,tables,constraints:{genderMode,excludedStudents,keepApart}}=cls;
+  if(!tables.length)return{};
+  const active=students.filter(s=>!excludedStudents.includes(s.id));
+  let ordered;
+  if(genderMode==='together'){
+    ordered=[...shuffle(active.filter(s=>s.gender==='M')),
+             ...shuffle(active.filter(s=>s.gender==='F')),
+             ...shuffle(active.filter(s=>s.gender!=='M'&&s.gender!=='F'))];
+  }else if(genderMode==='alternating'){
+    const M=shuffle(active.filter(s=>s.gender==='M'));
+    const F=shuffle(active.filter(s=>s.gender==='F'));
+    const X=shuffle(active.filter(s=>s.gender!=='M'&&s.gender!=='F'));
+    const r=[];let mi=0,fi=0;
+    while(mi<M.length||fi<F.length){if(mi<M.length)r.push(M[mi++]);if(fi<F.length)r.push(F[fi++]);}
+    ordered=[...r,...X];
+  }else{ordered=shuffle(active);}
+  const asgn={};tables.forEach(t=>{asgn[t.id]=[];});
+  ordered.forEach((s,i)=>asgn[tables[i%tables.length].id].push(s.id));
+  for(let it=0;it<80;it++){
+    let ok=true;
+    for(const[a,b]of keepApart){
+      const ta=Object.keys(asgn).find(id=>asgn[id].includes(a));
+      const tb=Object.keys(asgn).find(id=>asgn[id].includes(b));
+      if(ta&&tb&&ta===tb){
+        ok=false;
+        const others=tables.filter(t=>t.id!==ta);
+        if(others.length){
+          const nt=others[0|Math.random()*others.length];
+          const pool=asgn[nt.id];
+          if(pool.length){const si=0|Math.random()*pool.length;const sw=pool[si];
+            const ai=asgn[ta].indexOf(a);asgn[ta][ai]=sw;asgn[nt.id][si]=a;}
+        }
+      }
+    }
+    if(ok)break;
+  }
+  return asgn;
+}
+
+// ── CSV parser ─────────────────────────────────────────────────────────────────
+function parseNames(text){
+  return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).reduce((acc,line)=>{
+    const[name,...rest]=line.split(/,|\t/);
+    const n=name.trim();
+    if(!n||n.toLowerCase()==='name'||n.toLowerCase()==='student')return acc;
+    const g=(rest[0]||'').trim().toUpperCase();
+    return [...acc,{id:uid(),name:n,gender:g==='M'?'M':g==='F'?'F':g==='NB'?'NB':'NB'}];
+  },[]);
+}
+
+// ── Drag + click detection ─────────────────────────────────────────────────────
+// roomScale: CSS scale factor applied to room — divide mouse deltas by it
+function useDrag(cls,updateClass,roomScale){
+  const dr=useRef(null);
+  const rs=useRef(roomScale);
+  useEffect(()=>{rs.current=roomScale;},[roomScale]);
+
+  const onDown=useCallback((e,type,id)=>{
+    e.preventDefault();e.stopPropagation();
+    const tbl=type==='table'?cls.tables.find(t=>t.id===id):null;
+    dr.current={type,id,moved:false,
+      sx:e.clientX,sy:e.clientY,
+      ox:tbl?tbl.x:cls.screen.x,
+      oy:tbl?tbl.y:cls.screen.y};
+  },[cls]);
+
+  const onMove=useCallback((e)=>{
+    if(!dr.current)return;
+    const{type,id,sx,sy,ox,oy}=dr.current;
+    const dx=(e.clientX-sx)/rs.current, dy=(e.clientY-sy)/rs.current;
+    if(!dr.current.moved&&Math.hypot(e.clientX-sx,e.clientY-sy)<5)return;
+    dr.current.moved=true;
+    const size=cls.tableSize||'sm';
+    if(type==='table'){
+      const t=cls.tables.find(t=>t.id===id);
+      const w=tw(t.orientation,size),h=th(t.orientation,size);
+      updateClass(c=>({...c,tables:c.tables.map(t=>t.id===id
+        ?{...t,x:Math.max(0,Math.min(PW-w,ox+dx)),y:Math.max(0,Math.min(PH-h,oy+dy))}:t)}));
+    }else{
+      const sw2=cls.screen.orientation==='H'?SCR_W:SCR_H;
+      const sh2=cls.screen.orientation==='H'?SCR_H:SCR_W;
+      updateClass(c=>({...c,screen:{...c.screen,
+        x:Math.max(0,Math.min(PW-sw2,ox+dx)),
+        y:Math.max(0,Math.min(PH-sh2,oy+dy))}}));
+    }
+  },[cls,updateClass]);
+
+  const onUp=useCallback((e,onClickFn)=>{
+    if(!dr.current)return;
+    if(!dr.current.moved&&onClickFn)onClickFn(dr.current.type,dr.current.id);
+    dr.current=null;
+  },[]);
+
+  return{onDown,onMove,onUp};
+}
+
+// ── RoomCanvas ─────────────────────────────────────────────────────────────────
+function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
+  const assignment=historyEntry?historyEntry.assignment:cls.currentAssignment;
+  const readOnly=!!historyEntry;
+  const size=cls.tableSize||'sm';
+  const getS=id=>cls.students.find(s=>s.id===id);
+
+  const nameFontSize=size==='sm'?9:size==='md'?10.5:12.5;
+  const lblFontSize=size==='sm'?8.5:size==='md'?9.5:11;
+
+  const toggleOrient=useCallback((type,id)=>{
+    if(readOnly)return;
+    if(type==='table')
+      updateClass(c=>({...c,tables:c.tables.map(t=>t.id===id?{...t,orientation:t.orientation==='V'?'H':'V'}:t)}));
+    else
+      updateClass(c=>({...c,screen:{...c.screen,orientation:c.screen.orientation==='H'?'V':'H'}}));
+  },[readOnly,updateClass]);
+
+  const{onDown,onMove,onUp}=useDrag(cls,updateClass,roomScale);
+  const handleUp=useCallback((e)=>onUp(e,toggleOrient),[onUp,toggleOrient]);
+
+  const scr=cls.screen;
+  const scrW=scr.orientation==='H'?SCR_W:SCR_H;
+  const scrH=scr.orientation==='H'?SCR_H:SCR_W;
+
+  return(
+    <div onMouseMove={readOnly?null:onMove} onMouseUp={readOnly?null:handleUp}
+      onMouseLeave={readOnly?null:handleUp}
+      style={{width:PW,height:PH,position:'relative',userSelect:'none',
+        border:'2.5px solid #334155',borderRadius:5,overflow:'hidden',
+        background:'#faf8f4',
+        backgroundImage:'radial-gradient(circle,#c8b898 1px,transparent 1px)',
+        backgroundSize:`${BASE}px ${BASE}px`,
+        boxShadow:'inset 0 0 0 6px rgba(100,70,30,.04)'}}>
+
+      <div style={{position:'absolute',inset:0,pointerEvents:'none',
+        boxShadow:'inset 0 0 20px rgba(100,80,40,.08)'}}/>
+
+      <div style={{position:'absolute',bottom:4,right:8,fontSize:8.5,color:'#a08860',
+        background:'rgba(255,255,255,.65)',padding:'1px 6px',borderRadius:20,
+        pointerEvents:'none',fontWeight:500}}>
+        40′ × 20′ &nbsp;·&nbsp; 1 dot = 1 ft
+      </div>
+
+      {/* Screen */}
+      <div onMouseDown={readOnly?null:(e)=>onDown(e,'screen')}
+        title="Click to rotate · Drag to move"
+        style={{position:'absolute',left:scr.x,top:scr.y,width:scrW,height:scrH,
+          background:'linear-gradient(160deg,#1e293b 0%,#0f172a 100%)',
+          borderRadius:3,cursor:readOnly?'default':'pointer',zIndex:5,
+          display:'flex',alignItems:'center',justifyContent:'center',
+          boxShadow:'0 2px 10px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.07)'}}>
+        {scr.orientation==='H'?(
+          <span style={{color:'rgba(255,255,255,.9)',fontSize:9,fontWeight:800,
+            letterSpacing:2,textTransform:'uppercase'}}>▶ SCREEN</span>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:0}}>
+            {'SCREEN'.split('').map((ch,i)=>(
+              <span key={i} style={{color:'rgba(255,255,255,.9)',fontSize:8.5,
+                fontWeight:800,lineHeight:1.15,letterSpacing:0}}>{ch}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Tables */}
+      {cls.tables.map((t,idx)=>{
+        const W=tw(t.orientation,size), H=th(t.orientation,size);
+        const isV=t.orientation==='V';
+        const color=TCOLORS[idx%TCOLORS.length];
+        const dark=TDARKS[idx%TDARKS.length];
+        const ids=(assignment&&assignment[t.id])||[];
+        const studs=ids.map(id=>getS(id)).filter(Boolean);
+        const HBAR=isV?20:17;
+
+        const dispName=s=>{
+          const parts=s.name.trim().split(/\s+/);
+          if(size==='sm')return parts[0]+(parts[1]?' '+parts[1][0]+'.':'');
+          return s.name;
+        };
+
+        return(
+          <div key={t.id} onMouseDown={readOnly?null:(e)=>onDown(e,'table',t.id)}
+            title="Click to rotate · Drag to move"
+            style={{position:'absolute',left:t.x,top:t.y,width:W,height:H,
+              borderRadius:5,overflow:'hidden',cursor:readOnly?'default':'pointer',zIndex:10,
+              boxShadow:`0 3px 12px rgba(0,0,0,.2),0 0 0 1.5px ${dark}50`}}>
+
+            <div style={{position:'absolute',
+              left:0,top:0,
+              width:isV?W:HBAR,height:isV?HBAR:H,
+              background:`linear-gradient(${isV?'180deg':'90deg'},${color},${dark})`,
+              display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span style={{color:'rgba(255,255,255,.95)',fontSize:lblFontSize,fontWeight:800,
+                letterSpacing:.3,overflow:'hidden',
+                whiteSpace:'nowrap',textOverflow:'ellipsis',
+                writingMode:isV?'horizontal-tb':'vertical-lr',
+                textOrientation:'mixed',padding:isV?'0 3px':'3px 0',
+                maxWidth:isV?W-6:undefined,maxHeight:isV?undefined:H-6}}>
+                {t.label}
+              </span>
+            </div>
+
+            <div style={{position:'absolute',
+              left:isV?0:HBAR,top:isV?HBAR:0,
+              width:isV?W:W-HBAR,height:isV?H-HBAR:H,
+              background:'rgba(255,255,255,.93)',
+              display:'flex',flexWrap:'wrap',alignContent:'flex-start',
+              gap:2,padding:3,overflow:'hidden'}}>
+              {studs.map(s=>(
+                <div key={s.id} style={{display:'flex',alignItems:'center',gap:2,
+                  background:'#fff',borderRadius:3,
+                  borderLeft:`2.5px solid ${GCOLOR[s.gender]||GCOLOR.NB}`,
+                  padding:'1px 3px 1px 2px',
+                  fontSize:nameFontSize,lineHeight:1.25,color:'#1e293b',
+                  maxWidth:'100%',flexShrink:0,
+                  boxShadow:'0 1px 2px rgba(0,0,0,.07)',
+                  overflow:'hidden'}}>
+                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dispName(s)}</span>
+                </div>
+              ))}
+              {!ids.length&&<span style={{color:'#d1d5db',fontSize:nameFontSize-1,fontStyle:'italic'}}>empty</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Students Tab ───────────────────────────────────────────────────────────────
+function StudentsTab({cls,updateClass,openImport,clearOpenImport}){
+  const[newName,setNewName]=useState('');
+  const[newGender,setNewGender]=useState('NB');
+  const[importText,setImportText]=useState('');
+  const[showImport,setShowImport]=useState(false);
+  const fileRef=useRef(),pasteRef=useRef();
+
+  useEffect(()=>{
+    if(openImport){setShowImport(true);clearOpenImport();setTimeout(()=>pasteRef.current?.focus(),80);}
+  },[openImport]);
+
+  const add=()=>{
+    const name=newName.trim();if(!name)return;
+    updateClass(c=>({...c,students:[...c.students,{id:uid(),name,gender:newGender}]}));
+    setNewName('');setNewGender('NB');
+  };
+  const remove=id=>updateClass(c=>({...c,
+    students:c.students.filter(s=>s.id!==id),
+    constraints:{...c.constraints,
+      excludedStudents:c.constraints.excludedStudents.filter(x=>x!==id),
+      keepApart:c.constraints.keepApart.filter(p=>!p.includes(id))}}));
+  const setG=(id,g)=>updateClass(c=>({...c,
+    students:c.students.map(s=>s.id===id?{...s,gender:g}:s)}));
+  const doImport=()=>{
+    const parsed=parseNames(importText);if(!parsed.length)return;
+    const ex=new Set(cls.students.map(s=>s.name.toLowerCase()));
+    updateClass(c=>({...c,students:[...c.students,...parsed.filter(s=>!ex.has(s.name.toLowerCase()))]}));
+    setImportText('');setShowImport(false);
+  };
+  const handleFile=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();r.onload=ev=>{setImportText(ev.target.result);setShowImport(true);};
+    r.readAsText(f);e.target.value='';
+  };
+
+  const M=cls.students.filter(s=>s.gender==='M').length;
+  const F=cls.students.filter(s=>s.gender==='F').length;
+  const NB=cls.students.filter(s=>s.gender==='NB'||s.gender==='X').length;
+  const active=cls.students.filter(s=>!cls.constraints.excludedStudents.includes(s.id)).length;
+
+  return(
+    <div style={{padding:'11px 13px',display:'flex',flexDirection:'column',gap:8,height:'100%',overflow:'hidden'}}>
+      {/* Add one */}
+      <div style={{display:'flex',gap:5}}>
+        <input className="input" placeholder="Name…" value={newName}
+          onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}
+          style={{flex:1,fontSize:13,padding:'7px 9px'}}/>
+        <div style={{display:'flex',flexShrink:0,borderRadius:7,overflow:'hidden',
+          border:'1.5px solid #e2e8f0',alignSelf:'stretch'}}>
+          {['M','F','NB'].map((g,i)=>(
+            <label key={g} style={{display:'flex',alignItems:'center',cursor:'pointer',
+              padding:'0 7px',transition:'all .12s',fontWeight:700,fontSize:11.5,
+              color:newGender===g?'#fff':'#94a3b8',
+              background:newGender===g?(g==='M'?'#3b82f6':g==='F'?'#ec4899':'#8b5cf6'):'#fff',
+              borderRight:i<2?'1px solid #e2e8f0':'none'}}>
+              <input type="radio" name="newGender" value={g} checked={newGender===g}
+                onChange={()=>setNewGender(g)} style={{position:'absolute',opacity:0,width:0,height:0}}/>
+              {g}
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-primary" onClick={add} style={{padding:'7px 12px',fontSize:13}}>Add</button>
+      </div>
+
+      {/* Import bar */}
+      <div style={{display:'flex',gap:5}}>
+        <button className="btn btn-ghost" onClick={()=>setShowImport(v=>!v)}
+          style={{flex:1,fontSize:12,padding:'6px 8px',
+            background:showImport?'#eff6ff':'#fff',color:showImport?'#2563eb':'#475569',
+            borderColor:showImport?'#93c5fd':'#e2e8f0'}}>
+          📋 Paste / CSV
+        </button>
+        <button className="btn btn-ghost" onClick={()=>fileRef.current.click()}
+          style={{flex:1,fontSize:12,padding:'6px 8px'}}>
+          📂 File
+        </button>
+        <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:'none'}} onChange={handleFile}/>
+      </div>
+
+      {/* Paste panel */}
+      {showImport&&(
+        <div style={{background:'#f8fafc',border:'1.5px solid #dde5f0',borderRadius:9,
+          padding:'10px',display:'flex',flexDirection:'column',gap:7}}>
+          <div style={{fontSize:11,color:'#475569',fontWeight:500}}>
+            One name per line, or <code style={{background:'#e2e8f0',padding:'0 3px',borderRadius:3,fontSize:10}}>Name,M/F/NB</code> CSV:
+          </div>
+          <textarea ref={pasteRef} className="input" value={importText}
+            onChange={e=>setImportText(e.target.value)} rows={5} style={{fontSize:12.5}}
+            placeholder={"Alice,F\nBob,M\nSam\n…"}/>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn btn-success" onClick={doImport} style={{flex:1,fontSize:13}}>
+              ✓ Import{importText?` (${parseNames(importText).length})` :''}
+            </button>
+            <button className="btn btn-ghost" onClick={()=>{setShowImport(false);setImportText('');}}
+              style={{fontSize:13,padding:'8px 12px'}}>✕</button>
+          </div>
+          <div style={{fontSize:10,color:'#94a3b8',lineHeight:1.5}}>
+            Google Sheets → File → Download → CSV → import here
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',gap:2}}>
+        {!cls.students.length&&(
+          <div style={{textAlign:'center',color:'#94a3b8',fontSize:13,padding:'24px 0',lineHeight:1.7}}>
+            No students yet.<br/>Paste a class list above.
+          </div>
+        )}
+        {cls.students.map(s=>{
+          const excl=cls.constraints.excludedStudents.includes(s.id);
+          return(
+            <div key={s.id} style={{display:'flex',alignItems:'center',gap:5,
+              padding:'5px 8px',borderRadius:7,border:'1px solid',
+              borderColor:excl?'#fde68a':'#e2e8f0',
+              background:excl?'#fffbeb':'#fff',opacity:excl?.6:1}}>
+              <div style={{display:'flex',flexShrink:0,borderRadius:5,overflow:'hidden',
+                border:'1px solid #e2e8f0'}}>
+                {['M','F','NB'].map((g,i)=>(
+                  <label key={g} style={{display:'flex',alignItems:'center',cursor:'pointer',
+                    padding:'2px 4px',transition:'all .1s',fontWeight:700,fontSize:10,
+                    color:s.gender===g?'#fff':'#94a3b8',
+                    background:s.gender===g?(g==='M'?'#3b82f6':g==='F'?'#ec4899':'#8b5cf6'):'transparent',
+                    borderRight:i<2?'1px solid #e2e8f0':'none'}}>
+                    <input type="radio" name={`g-${s.id}`} value={g} checked={s.gender===g}
+                      onChange={()=>setG(s.id,g)} style={{position:'absolute',opacity:0,width:0,height:0}}/>
+                    {g}
+                  </label>
+                ))}
+              </div>
+              <span style={{flex:1,fontSize:13,fontWeight:500,color:'#1e293b',
+                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
+              {excl&&<span style={{fontSize:9,color:'#b45309',fontWeight:700,flexShrink:0}}>OUT</span>}
+              <button onClick={()=>remove(s.id)}
+                style={{border:'none',background:'none',color:'#cbd5e1',cursor:'pointer',
+                  fontSize:16,lineHeight:1,padding:'0 2px',flexShrink:0}}>×</button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{display:'flex',justifyContent:'space-between',
+        fontSize:11,color:'#94a3b8',paddingTop:5,borderTop:'1px solid #f1f5f9'}}>
+        <span>{cls.students.length} total</span>
+        <span style={{color:'#3b82f6'}}>{M} M</span>
+        <span style={{color:'#ec4899'}}>{F} F</span>
+        {NB>0&&<span style={{color:'#8b5cf6'}}>{NB} NB</span>}
+        <span style={{color:'#64748b'}}>{active} active</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Tables Tab ─────────────────────────────────────────────────────────────────
+function TablesTab({cls,updateClass}){
+  const n=cls.tables.length, size=cls.tableSize||'sm';
+
+  const setCount=cnt=>updateClass(c=>{
+    const sz=c.tableSize||'sm';
+    const pos=tablePositions(cnt,sz);
+    const tables=pos.map((p,i)=>({
+      id:c.tables[i]?.id||uid(),
+      label:c.tables[i]?.label||`Table ${i+1}`,
+      orientation:c.tables[i]?.orientation||'V',
+      ...p
+    }));
+    return{...c,tables};
+  });
+
+  const setSize=s=>updateClass(c=>{
+    const pos=tablePositions(c.tables.length,s);
+    return{...c,tableSize:s,
+      tables:pos.map((p,i)=>({
+        id:c.tables[i].id,
+        label:c.tables[i].label,
+        orientation:c.tables[i].orientation,
+        ...p
+      }))};
+  });
+
+  const relayout=()=>updateClass(c=>{
+    const pos=tablePositions(c.tables.length,c.tableSize||'sm');
+    return{...c,tables:pos.map((p,i)=>({
+      id:c.tables[i].id, label:c.tables[i]?.label||`Table ${i+1}`,
+      orientation:c.tables[i]?.orientation||'V', ...p}))};
+  });
+
+  const rename=(id,label)=>updateClass(c=>({...c,tables:c.tables.map(t=>t.id===id?{...t,label}:t)}));
+  const toggleO=id=>updateClass(c=>({...c,tables:c.tables.map(t=>t.id===id?{...t,orientation:t.orientation==='V'?'H':'V'}:t)}));
+  const toggleScr=()=>updateClass(c=>({...c,screen:{...c.screen,orientation:c.screen.orientation==='H'?'V':'H'}}));
+
+  return(
+    <div style={{padding:'11px 13px',display:'flex',flexDirection:'column',gap:13,overflowY:'auto',height:'100%'}}>
+      <div>
+        <div className="section-lbl">Number of Tables (0–8)</div>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {[0,1,2,3,4,5,6,7,8].map(i=>(
+            <button key={i} onClick={()=>setCount(i)}
+              style={{width:33,height:33,border:'1.5px solid',borderRadius:7,cursor:'pointer',
+                fontWeight:700,fontSize:14,transition:'all .12s',
+                background:n===i?TCOLORS[Math.max(0,i-1)]:'#fff',
+                borderColor:n===i?TCOLORS[Math.max(0,i-1)]:'#e2e8f0',
+                color:n===i?'#fff':'#374151',
+                boxShadow:n===i?`0 2px 8px ${TCOLORS[Math.max(0,i-1)]}55`:'none'}}>
+              {i}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="section-lbl">Table Size (preserves rotation &amp; seating)</div>
+        <div style={{display:'flex',gap:6}}>
+          {[['sm','S','Small','2.5×5\''],['md','M','Medium','3.5×7\''],['lg','L','Large','4.5×9\'']].map(([val,lbl,name,dims])=>(
+            <button key={val} onClick={()=>setSize(val)}
+              style={{flex:1,padding:'8px 5px',border:'1.5px solid',borderRadius:9,cursor:'pointer',
+                textAlign:'center',transition:'all .13s',
+                background:size===val?'#eff6ff':'#fff',
+                borderColor:size===val?'#2563eb':'#e2e8f0',
+                color:size===val?'#1d4ed8':'#475569',
+                boxShadow:size===val?'0 2px 8px rgba(37,99,235,.18)':'none'}}>
+              <div style={{fontSize:18,fontWeight:900,lineHeight:1}}>{lbl}</div>
+              <div style={{fontSize:10,fontWeight:600,marginTop:2}}>{name}</div>
+              <div style={{fontSize:9,color:'#94a3b8',marginTop:1}}>{dims}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button className="btn btn-ghost" onClick={relayout} style={{fontSize:12.5,justifyContent:'center',padding:'7px'}}>
+        ⟳ Auto-Layout Tables
+      </button>
+
+      <div>
+        <div className="section-lbl">Labels &amp; Orientation</div>
+        <div style={{display:'flex',flexDirection:'column',gap:5}}>
+          {!cls.tables.length&&<div style={{fontSize:12,color:'#94a3b8',textAlign:'center',padding:8}}>No tables</div>}
+          {cls.tables.map((t,i)=>(
+            <div key={t.id} style={{display:'flex',alignItems:'center',gap:6,
+              padding:'6px 10px',background:'#fff',borderRadius:8,
+              border:`1.5px solid ${TCOLORS[i%TCOLORS.length]}33`,
+              boxShadow:`inset 3px 0 0 ${TCOLORS[i%TCOLORS.length]}`}}>
+              <input value={t.label} onChange={e=>rename(t.id,e.target.value)}
+                style={{flex:1,border:'none',background:'transparent',fontSize:13,
+                  fontWeight:600,color:'#1e293b',outline:'none',minWidth:0}}/>
+              <button onClick={()=>toggleO(t.id)}
+                style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:5,
+                  cursor:'pointer',fontSize:11,padding:'3px 8px',color:'#475569',
+                  fontWeight:600,flexShrink:0}}>
+                {t.orientation==='V'?'↕ V':'↔ H'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="section-lbl">Screen</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+          background:'#f8fafc',borderRadius:8,border:'1.5px solid #e2e8f0'}}>
+          <span style={{fontSize:13,flex:1,fontWeight:600,color:'#334155'}}>▶ Projection Screen</span>
+          <button onClick={toggleScr}
+            style={{border:'1px solid #e2e8f0',background:'#fff',borderRadius:6,
+              cursor:'pointer',fontSize:11.5,padding:'3px 10px',color:'#475569',fontWeight:600}}>
+            {cls.screen.orientation==='H'?'↔ H':'↕ V'}
+          </button>
+        </div>
+        <div style={{fontSize:10,color:'#94a3b8',marginTop:4}}>
+          Click screen in room to rotate · Drag to move
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Settings Tab ───────────────────────────────────────────────────────────────
+function SettingsTab({cls,updateClass}){
+  const{constraints,students}=cls;
+  const[kaA,setKaA]=useState('');
+  const[kaB,setKaB]=useState('');
+
+  const setGM=m=>updateClass(c=>({...c,constraints:{...c.constraints,genderMode:m}}));
+  const setGS=g=>updateClass(c=>({...c,constraints:{...c.constraints,groupSize:+g}}));
+  const toggleEx=id=>updateClass(c=>{
+    const ex=c.constraints.excludedStudents;
+    return{...c,constraints:{...c.constraints,
+      excludedStudents:ex.includes(id)?ex.filter(x=>x!==id):[...ex,id]}};
+  });
+  const addKA=()=>{
+    if(!kaA||!kaB||kaA===kaB)return;
+    const pair=[kaA,kaB].sort();
+    if(constraints.keepApart.some(p=>p[0]===pair[0]&&p[1]===pair[1]))return;
+    updateClass(c=>({...c,constraints:{...c.constraints,keepApart:[...c.constraints.keepApart,pair]}}));
+    setKaA('');setKaB('');
+  };
+  const rmKA=i=>updateClass(c=>({...c,constraints:{...c.constraints,
+    keepApart:c.constraints.keepApart.filter((_,j)=>j!==i)}}));
+
+  return(
+    <div style={{padding:'11px 13px',display:'flex',flexDirection:'column',gap:13,overflowY:'auto',height:'100%'}}>
+      <div>
+        <div className="section-lbl">Seats per Table</div>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {[2,3,4,5,6,7,8].map(n=>(
+            <button key={n} onClick={()=>setGS(n)}
+              style={{width:34,height:34,border:'1.5px solid',borderRadius:7,cursor:'pointer',
+                fontWeight:700,fontSize:14,transition:'all .12s',
+                background:constraints.groupSize===n?'#2563eb':'#fff',
+                borderColor:constraints.groupSize===n?'#2563eb':'#e2e8f0',
+                color:constraints.groupSize===n?'#fff':'#374151',
+                boxShadow:constraints.groupSize===n?'0 2px 6px rgba(37,99,235,.25)':'none'}}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="section-lbl">Gender Seating</div>
+        {[['mixed','🔀 Random','No gender preference'],
+          ['together','🟦🟧 By gender','Same gender at same tables'],
+          ['alternating','⇄ Alternating','Boy–girl–boy–girl within tables']
+        ].map(([val,title,desc])=>(
+          <div key={val} onClick={()=>setGM(val)}
+            style={{display:'flex',alignItems:'flex-start',gap:9,cursor:'pointer',
+              padding:'8px 10px',borderRadius:8,marginBottom:5,
+              border:`1.5px solid ${constraints.genderMode===val?'#2563eb':'#e2e8f0'}`,
+              background:constraints.genderMode===val?'#eff6ff':'#fff',transition:'all .12s'}}>
+            <div style={{width:14,height:14,borderRadius:'50%',border:'2px solid',marginTop:2,flexShrink:0,
+              borderColor:constraints.genderMode===val?'#2563eb':'#cbd5e1',
+              background:constraints.genderMode===val?'#2563eb':'transparent',
+              boxShadow:constraints.genderMode===val?'inset 0 0 0 2px #fff':'none'}}/>
+            <div>
+              <div style={{fontSize:12.5,fontWeight:600,color:'#1e293b'}}>{title}</div>
+              <div style={{fontSize:10.5,color:'#64748b',marginTop:1}}>{desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <div className="section-lbl">Keep Apart</div>
+        <div style={{display:'flex',gap:5,marginBottom:6}}>
+          <select value={kaA} onChange={e=>setKaA(e.target.value)}
+            style={{flex:1,padding:'6px',border:'1.5px solid #e2e8f0',borderRadius:7,
+              fontSize:12,background:'#fff',color:'#374151'}}>
+            <option value="">Student A…</option>
+            {students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={kaB} onChange={e=>setKaB(e.target.value)}
+            style={{flex:1,padding:'6px',border:'1.5px solid #e2e8f0',borderRadius:7,
+              fontSize:12,background:'#fff',color:'#374151'}}>
+            <option value="">Student B…</option>
+            {students.filter(s=>s.id!==kaA).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button className="btn btn-primary" onClick={addKA} style={{padding:'6px 11px',fontSize:13}}>+</button>
+        </div>
+        {!constraints.keepApart.length&&<div style={{fontSize:11.5,color:'#94a3b8',textAlign:'center'}}>No rules set</div>}
+        {constraints.keepApart.map((pair,i)=>{
+          const a=students.find(s=>s.id===pair[0]),b=students.find(s=>s.id===pair[1]);
+          return(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:7,
+              padding:'6px 9px',background:'#fef2f2',borderRadius:7,
+              border:'1px solid #fecaca',marginBottom:4}}>
+              <span style={{fontSize:12,flex:1,color:'#991b1b',fontWeight:500}}>
+                🚫 {a?.name||'?'} ↔ {b?.name||'?'}
+              </span>
+              <button onClick={()=>rmKA(i)} style={{border:'none',background:'none',color:'#ef4444',cursor:'pointer',fontSize:16}}>×</button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div>
+        <div className="section-lbl">Exclude from Shuffle</div>
+        <div style={{display:'flex',flexDirection:'column',gap:3,maxHeight:160,overflowY:'auto'}}>
+          {!students.length&&<div style={{fontSize:12,color:'#94a3b8'}}>No students yet</div>}
+          {students.map(s=>{
+            const excl=constraints.excludedStudents.includes(s.id);
+            return(
+              <label key={s.id} style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',
+                padding:'5px 8px',borderRadius:6,
+                background:excl?'#fffbeb':'#f8fafc',border:`1px solid ${excl?'#fde68a':'#e2e8f0'}`}}>
+                <input type="checkbox" checked={excl} onChange={()=>toggleEx(s.id)} style={{accentColor:'#f97316'}}/>
+                <span className={`tag tag-${s.gender==='X'?'NB':s.gender}`}>{s.gender==='M'?'M':s.gender==='F'?'F':'NB'}</span>
+                <span style={{fontSize:12.5,color:'#1e293b',flex:1}}>{s.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <button className="btn btn-red"
+        onClick={()=>updateClass(c=>({...c,constraints:{...c.constraints,excludedStudents:[],keepApart:[]}}))}
+        style={{fontSize:12,justifyContent:'center'}}>Clear All Constraints</button>
+    </div>
+  );
+}
+
+// ── History Modal ──────────────────────────────────────────────────────────────
+function HistoryModal({cls,onClose,onRestore}){
+  const[viewId,setViewId]=useState(null);
+  const viewing=viewId?cls.seatingHistory.find(h=>h.id===viewId):null;
+  const summary=a=>cls.tables.map(t=>{
+    const names=(a[t.id]||[]).map(id=>cls.students.find(s=>s.id===id)?.name||'?').join(', ');
+    return`${t.label}: ${names||'empty'}`;
+  }).join(' • ');
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+          <div style={{fontSize:17,fontWeight:700,color:'#0f172a'}}>📅 History — {cls.name}</div>
+          <button onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
+        </div>
+        {!cls.seatingHistory.length&&(
+          <div style={{textAlign:'center',color:'#94a3b8',padding:'32px 0',fontSize:13}}>
+            No history yet — shuffle to create entries!
+          </div>
+        )}
+        {!viewId&&cls.seatingHistory.map(h=>(
+          <div key={h.id} onClick={()=>setViewId(h.id)}
+            style={{padding:'10px 13px',border:'1.5px solid #e2e8f0',borderRadius:9,
+              marginBottom:7,background:'#f8fafc',cursor:'pointer',transition:'border .12s'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor='#2563eb'}
+            onMouseLeave={e=>e.currentTarget.style.borderColor='#e2e8f0'}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <div style={{fontWeight:700,fontSize:13,color:'#0f172a'}}>{fmt(h.date)}</div>
+              <div style={{display:'flex',gap:5}}>
+                <button className="btn btn-ghost" onClick={ev=>{ev.stopPropagation();setViewId(h.id);}} style={{fontSize:11,padding:'3px 9px'}}>View</button>
+                <button className="btn btn-success" onClick={ev=>{ev.stopPropagation();onRestore(h);onClose();}} style={{fontSize:11,padding:'3px 9px'}}>↩ Restore</button>
+              </div>
+            </div>
+            <div style={{fontSize:10.5,color:'#64748b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{summary(h.assignment)}</div>
+          </div>
+        ))}
+        {viewId&&viewing&&(
+          <div>
+            <button className="btn btn-ghost" onClick={()=>setViewId(null)} style={{marginBottom:13,fontSize:12}}>← Back</button>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12,color:'#0f172a'}}>{fmt(viewing.date)}</div>
+            {cls.tables.map((t,i)=>{
+              const studs=(viewing.assignment[t.id]||[]).map(id=>cls.students.find(s=>s.id===id)).filter(Boolean);
+              return(
+                <div key={t.id} style={{padding:'9px 12px',marginBottom:8,background:'#f8fafc',
+                  border:`1.5px solid ${TCOLORS[i%TCOLORS.length]}44`,borderRadius:9,
+                  boxShadow:`inset 4px 0 0 ${TCOLORS[i%TCOLORS.length]}`}}>
+                  <div style={{fontWeight:700,fontSize:12,marginBottom:5,color:TCOLORS[i%TCOLORS.length]}}>{t.label}</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                    {!studs.length&&<span style={{fontSize:11,color:'#94a3b8'}}>Empty</span>}
+                    {studs.map(s=>(
+                      <span key={s.id} style={{background:'#fff',borderRadius:20,padding:'2px 9px',
+                        fontSize:12,color:'#1e293b',border:'1px solid #e2e8f0',
+                        borderLeft:`3px solid ${GCOLOR[s.gender]||GCOLOR.NB}`}}>
+                        {s.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{marginTop:14,display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <button className="btn btn-ghost" onClick={()=>setViewId(null)}>← Back</button>
+              <button className="btn btn-success" onClick={()=>{onRestore(viewing);onClose();}}>↩ Restore</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NewClassModal({onSave,onClose}){
+  const[name,setName]=useState('');const ref=useRef();
+  useEffect(()=>ref.current?.focus(),[]);
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{minWidth:360}}>
+        <div style={{fontSize:17,fontWeight:700,color:'#0f172a',marginBottom:16}}>➕ New Class</div>
+        <input ref={ref} className="input" placeholder="e.g. 3C 2025-2026"
+          value={name} onChange={e=>setName(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&name.trim()&&onSave(name.trim())}
+          style={{marginBottom:16,fontSize:14}}/>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={!name.trim()} onClick={()=>name.trim()&&onSave(name.trim())}>
+            Create Class
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RenameModal({current,onSave,onClose}){
+  const[name,setName]=useState(current);
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{minWidth:360}}>
+        <div style={{fontSize:17,fontWeight:700,color:'#0f172a',marginBottom:16}}>✏️ Rename</div>
+        <input className="input" autoFocus value={name} onChange={e=>setName(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&name.trim()&&onSave(name.trim())}
+          style={{marginBottom:16,fontSize:14}}/>
+        <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={!name.trim()} onClick={()=>name.trim()&&onSave(name.trim())}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Sign-In Screen ─────────────────────────────────────────────────────────────
+function SignInScreen({onSignIn}){
+  const[busy,setBusy]=useState(false);
+  const[err,setErr]=useState('');
+  const handle=async()=>{
+    setBusy(true);setErr('');
+    try{await onSignIn();}
+    catch(e){setErr(e.message||'Sign-in failed. Please try again.');}
+    finally{setBusy(false);}
+  };
+  return(
+    <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',
+      background:'linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0f172a 100%)'}}>
+      <div style={{background:'#fff',borderRadius:18,padding:'44px 50px',
+        textAlign:'center',boxShadow:'0 32px 80px rgba(0,0,0,.45)',maxWidth:380,width:'90%'}}>
+        <div style={{fontSize:52,marginBottom:14}}>🪑</div>
+        <div style={{fontSize:22,fontWeight:800,color:'#0f172a',marginBottom:6,letterSpacing:-.4}}>
+          Seating Chart Builder
+        </div>
+        <div style={{fontSize:13.5,color:'#64748b',marginBottom:30,lineHeight:1.65}}>
+          Sign in with your Google Workspace account to access your classes from any device.
+        </div>
+        <button onClick={handle} disabled={busy}
+          style={{display:'flex',alignItems:'center',gap:11,padding:'13px 22px',
+            background:busy?'#f8fafc':'#fff',border:'2px solid #e2e8f0',borderRadius:10,
+            cursor:busy?'default':'pointer',fontSize:14,fontWeight:600,color:'#1e293b',
+            width:'100%',justifyContent:'center',
+            boxShadow:'0 2px 10px rgba(0,0,0,.08)',transition:'all .14s',opacity:busy?.7:1}}>
+          {/* Google logo SVG */}
+          <svg width="20" height="20" viewBox="0 0 24 24" style={{flexShrink:0}}>
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          {busy?'Signing in…':'Sign in with Google'}
+        </button>
+        {err&&(
+          <div style={{marginTop:14,fontSize:12,color:'#dc2626',background:'#fef2f2',
+            border:'1px solid #fecaca',borderRadius:7,padding:'8px 12px',textAlign:'left'}}>
+            ⚠ {err}
+          </div>
+        )}
+        <div style={{fontSize:11,color:'#94a3b8',marginTop:18,lineHeight:1.6}}>
+          Uses your markdayschool.org account.<br/>
+          Data syncs automatically across all browsers.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── App ────────────────────────────────────────────────────────────────────────
+function App(){
+  // ── Auth state ──────────────────────────────────────────────────────────────
+  const [fbUser,    setFbUser]    = useState(null);
+  const [authReady, setAuthReady] = useState(!FB_READY); // true when auth check done
+  const [dataReady, setDataReady] = useState(!FB_READY); // true when Firestore data loaded
+  const [syncSt,    setSyncSt]    = useState('local');   // 'local'|'syncing'|'synced'|'error'
+  const saveTimer = useRef(null);
+  const skipSave  = useRef(false); // set true right after loading from Firestore
+
+  // ── App state ───────────────────────────────────────────────────────────────
+  const[data,setData]=useState(()=>{
+    if(FB_READY) return{classes:[],activeClassId:null}; // Firebase will supply data
+    try{const s=localStorage.getItem(STORAGE);if(s)return JSON.parse(s);}catch(e){}
+    return{classes:[],activeClassId:null};
+  });
+  const[rightTab,setRightTab]=useState('students');
+  const[modal,setModal]=useState(null);
+  const[shuffleAnim,setShuffleAnim]=useState(false);
+  const[openImport,setOpenImport]=useState(false);
+  const[isFS,setIsFS]=useState(false);
+  const[winW,setWinW]=useState(window.innerWidth);
+  const[winH,setWinH]=useState(window.innerHeight);
+
+  // ── Firebase auth listener ───────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!fbAuth)return;
+    return fbAuth.onAuthStateChanged(async u=>{
+      setFbUser(u);
+      if(u){
+        try{
+          const snap=await fbDb.collection('users').doc(u.uid).get();
+          if(snap.exists&&snap.data().d){
+            skipSave.current=true; // don't immediately re-save what we just loaded
+            setData(snap.data().d);
+          }
+        }catch(e){console.error('Firestore load error:',e);}
+        setDataReady(true);
+      }else{
+        setDataReady(true); // no user → skip Firestore, use localStorage
+      }
+      setAuthReady(true);
+    });
+  },[]);
+
+  // ── Window resize ────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    const fn=()=>{setWinW(window.innerWidth);setWinH(window.innerHeight);};
+    window.addEventListener('resize',fn);
+    return()=>window.removeEventListener('resize',fn);
+  },[]);
+
+  // ── Fullscreen ───────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    const fn=()=>setIsFS(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange',fn);
+    return()=>document.removeEventListener('fullscreenchange',fn);
+  },[]);
+
+  const toggleFS=()=>{
+    if(!document.fullscreenElement){
+      document.documentElement.requestFullscreen().catch(()=>{});
+    }else{
+      document.exitFullscreen().catch(()=>{});
+    }
+  };
+
+  // ── Persist data ─────────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!authReady||!dataReady)return;
+    if(skipSave.current){skipSave.current=false;return;}
+
+    if(fbDb&&fbUser){
+      clearTimeout(saveTimer.current);
+      setSyncSt('syncing');
+      saveTimer.current=setTimeout(()=>{
+        fbDb.collection('users').doc(fbUser.uid)
+          .set({d:data,savedAt:firebase.firestore.FieldValue.serverTimestamp()})
+          .then(()=>setSyncSt('synced'))
+          .catch(()=>setSyncSt('error'));
+      },1200);
+    }else{
+      localStorage.setItem(STORAGE,JSON.stringify(data));
+    }
+  },[data,fbUser,authReady,dataReady]);
+
+  const signIn  = ()=>fbAuth.signInWithPopup(gProvider);
+  const signOut = ()=>fbAuth.signOut().then(()=>{
+    setData({classes:[],activeClassId:null});
+    setSyncSt('local');
+  });
+
+  // ── Dynamic room scale ───────────────────────────────────────────────────────
+  const SIDEBAR=215, PANEL=286, TOOLBAR=52, PAD=28;
+  const sidebarVisible=!isFS;
+  const panelVisible=!isFS&&!!data.classes.find(c=>c.id===data.activeClassId);
+  const toolbarVisible=!isFS;
+
+  const availW=winW-(sidebarVisible?SIDEBAR:0)-(panelVisible?PANEL:0)-(isFS?16:PAD*2);
+  const availH=winH-(toolbarVisible?TOOLBAR:0)-(isFS?60:PAD+36);
+  const roomScale=Math.max(0.5,Math.min(availW/PW,availH/PH));
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const cls=data.classes.find(c=>c.id===data.activeClassId)||null;
+
+  const updateClass=useCallback(fn=>{
+    setData(prev=>({...prev,classes:prev.classes.map(c=>c.id===prev.activeClassId?fn(c):c)}));
+  },[]);
+
+  const createClass=name=>{
+    const nc=mkClass(name);
+    setData(prev=>({...prev,classes:[...prev.classes,nc],activeClassId:nc.id}));
+    setModal(null);setRightTab('students');setOpenImport(true);
+  };
+  const deleteClass=id=>{
+    if(!window.confirm('Delete this class and all its data?'))return;
+    setData(prev=>{
+      const rest=prev.classes.filter(c=>c.id!==id);
+      return{...prev,classes:rest,activeClassId:prev.activeClassId===id?(rest[0]?.id||null):prev.activeClassId};
+    });
+  };
+  const renameClass=name=>{updateClass(c=>({...c,name}));setModal(null);};
+
+  const handleShuffle=()=>{
+    if(!cls||!cls.tables.length)return;
+    setShuffleAnim(true);setTimeout(()=>setShuffleAnim(false),700);
+    const assignment=generateAssignment(cls);
+    const entry={id:uid(),date:new Date().toISOString(),assignment};
+    updateClass(c=>({...c,currentAssignment:assignment,seatingHistory:[entry,...c.seatingHistory]}));
+  };
+
+  const handleExportCSV=()=>{
+    if(!cls||!cls.currentAssignment)return;
+    const rows=['Table,Student,Gender'];
+    cls.tables.forEach(t=>{(cls.currentAssignment[t.id]||[]).forEach(id=>{
+      const s=cls.students.find(x=>x.id===id);
+      if(s)rows.push(`"${t.label}","${s.name}","${s.gender}"`);
+    });});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+    a.download=`${cls.name.replace(/\s+/g,'-')}-seating.csv`;a.click();
+  };
+
+  const last=cls?.seatingHistory.length?fmt(cls.seatingHistory[0].date):null;
+
+  // ── Loading / auth screens ────────────────────────────────────────────────────
+  if(!authReady){
+    return(
+      <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',
+        background:'#0f172a',flexDirection:'column',gap:14}}>
+        <div style={{fontSize:36}}>🪑</div>
+        <div style={{color:'rgba(255,255,255,.5)',fontSize:14}}>Loading…</div>
+      </div>
+    );
+  }
+
+  if(FB_READY&&!fbUser){
+    return <SignInScreen onSignIn={signIn}/>;
+  }
+
+  // ── Room display helper ───────────────────────────────────────────────────────
+  const RoomDisplay=()=>cls?(
+    <div>
+      <div className="print-hdr" style={{marginBottom:14}}>
+        <div style={{fontSize:22,fontWeight:800,color:'#0f172a'}}>{cls.name}</div>
+        <div style={{fontSize:13,color:'#64748b',marginTop:3}}>
+          Seating Chart · {new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+        </div>
+      </div>
+      <div style={{width:PW*roomScale,height:PH*roomScale,position:'relative',flexShrink:0}}>
+        <div style={{position:'absolute',top:0,left:0,width:PW,height:PH,
+          transform:`scale(${roomScale})`,transformOrigin:'top left'}}>
+          <RoomCanvas cls={cls} updateClass={updateClass} roomScale={roomScale} isFS={isFS}/>
+        </div>
+      </div>
+      {!isFS&&cls.tables.length>0&&(
+        <div style={{display:'flex',gap:14,marginTop:10,flexWrap:'wrap',padding:'0 2px'}}>
+          {cls.tables.map((t,i)=>{
+            const cnt=(cls.currentAssignment&&cls.currentAssignment[t.id]?.length)||0;
+            return(
+              <div key={t.id} style={{display:'flex',alignItems:'center',gap:5}}>
+                <div style={{width:9,height:9,background:TCOLORS[i%TCOLORS.length],borderRadius:2}}/>
+                <span style={{fontSize:11.5,color:'#64748b',fontWeight:500}}>
+                  {t.label} <span style={{color:'#94a3b8'}}>({cnt})</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!isFS&&!cls.currentAssignment&&(
+        <div style={{marginTop:10,padding:'11px 16px',background:'rgba(255,251,235,.95)',
+          border:'1.5px solid #fde68a',borderRadius:9,fontSize:13,color:'#92400e',
+          maxWidth:PW*roomScale,lineHeight:1.6}}>
+          💡 Press <strong>🔀 Shuffle!</strong> to assign students to tables.
+          <span style={{color:'#b45309'}}> Click a table or screen to rotate. Drag to reposition.</span>
+        </div>
+      )}
+    </div>
+  ):(
+    <div style={{textAlign:'center',padding:'60px 20px'}}>
+      <div style={{fontSize:64,marginBottom:16}}>🪑</div>
+      <div style={{fontSize:24,fontWeight:800,color:'#1e293b',marginBottom:10}}>Seating Chart Builder</div>
+      <div style={{fontSize:15,color:'#64748b',marginBottom:28,lineHeight:1.6}}>
+        Create a class, add students, and hit Shuffle!
+      </div>
+      <button className="btn btn-primary" onClick={()=>setModal('newClass')}
+        style={{fontSize:15,padding:'12px 28px',borderRadius:9}}>
+        + Create Your First Class
+      </button>
+    </div>
+  );
+
+  return(
+    <div style={{display:'flex',height:'100vh',overflow:'hidden'}}>
+
+      {/* ── Sidebar ── */}
+      {sidebarVisible&&(
+        <aside className="no-print" style={{width:SIDEBAR,background:'#0f172a',
+          display:'flex',flexDirection:'column',flexShrink:0,
+          boxShadow:'2px 0 14px rgba(0,0,0,.22)'}}>
+          <div style={{padding:'14px 14px 12px',borderBottom:'1px solid rgba(255,255,255,.07)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:9}}>
+              <div style={{width:32,height:32,background:'linear-gradient(135deg,#3b82f6,#8b5cf6)',
+                borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:17,flexShrink:0,boxShadow:'0 2px 8px rgba(59,130,246,.4)'}}>🪑</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:800,color:'#f1f5f9',letterSpacing:-.3}}>Seating Chart</div>
+                <div style={{fontSize:9.5,color:'rgba(255,255,255,.3)'}}>Classroom Builder</div>
+              </div>
+            </div>
+            {/* User info */}
+            {fbUser&&(
+              <div style={{display:'flex',alignItems:'center',gap:7,marginTop:10,
+                padding:'7px 8px',background:'rgba(255,255,255,.07)',borderRadius:8}}>
+                {fbUser.photoURL&&(
+                  <img src={fbUser.photoURL} alt="" referrerPolicy="no-referrer"
+                    style={{width:24,height:24,borderRadius:'50%',border:'1.5px solid rgba(255,255,255,.2)',flexShrink:0}}/>
+                )}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,fontWeight:600,color:'rgba(255,255,255,.8)',
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {fbUser.displayName||fbUser.email}
+                  </div>
+                  <div style={{fontSize:9,color:'rgba(255,255,255,.3)',
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {fbUser.email}
+                  </div>
+                </div>
+                <button onClick={signOut}
+                  style={{border:'1px solid rgba(255,255,255,.15)',background:'transparent',
+                    color:'rgba(255,255,255,.4)',borderRadius:5,padding:'2px 6px',
+                    cursor:'pointer',fontSize:10,flexShrink:0}}>
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div style={{flex:1,overflowY:'auto',padding:'9px 9px 0'}}>
+            <div style={{fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:.9,
+              color:'rgba(255,255,255,.28)',padding:'0 5px',marginBottom:5}}>Classes</div>
+            {!data.classes.length&&(
+              <div style={{fontSize:12,color:'rgba(255,255,255,.2)',textAlign:'center',padding:'18px 0',lineHeight:1.7}}>
+                No classes yet.<br/>Create one below!
+              </div>
+            )}
+            {data.classes.map((c,ci)=>{
+              const active=data.activeClassId===c.id;
+              return(
+                <div key={c.id} onClick={()=>setData(prev=>({...prev,activeClassId:c.id}))}
+                  style={{display:'flex',alignItems:'center',padding:'8px 9px',borderRadius:9,
+                    cursor:'pointer',marginBottom:2,transition:'all .13s',
+                    background:active?'rgba(59,130,246,.2)':'transparent',
+                    border:`1px solid ${active?'rgba(59,130,246,.35)':'transparent'}`}}>
+                  <div style={{width:3,height:28,borderRadius:3,marginRight:9,flexShrink:0,
+                    background:active?TCOLORS[ci%TCOLORS.length]:'transparent',transition:'background .13s'}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12.5,fontWeight:600,color:active?'#f1f5f9':'#94a3b8',
+                      whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.name}</div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,.22)',marginTop:1}}>
+                      {c.students.length} students · {c.tables.length} tables
+                    </div>
+                  </div>
+                  <button onClick={e=>{e.stopPropagation();deleteClass(c.id);}}
+                    style={{border:'none',background:'none',color:'rgba(255,255,255,.18)',cursor:'pointer',
+                      fontSize:15,padding:'2px 4px',lineHeight:1,flexShrink:0}}>×</button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{padding:'8px 9px'}}>
+            <button className="btn btn-primary" onClick={()=>setModal('newClass')}
+              style={{width:'100%',justifyContent:'center',fontSize:13,padding:'8px',borderRadius:8}}>
+              + New Class
+            </button>
+          </div>
+
+          {cls&&cls.seatingHistory.length>0&&(
+            <div style={{padding:'0 9px 10px',borderTop:'1px solid rgba(255,255,255,.06)',paddingTop:9}}>
+              <div style={{fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:.9,
+                color:'rgba(255,255,255,.28)',padding:'0 5px',marginBottom:5}}>Recent</div>
+              {cls.seatingHistory.slice(0,3).map(h=>(
+                <div key={h.id} style={{fontSize:10,color:'rgba(255,255,255,.35)',
+                  padding:'3px 6px',borderRadius:4,marginBottom:2,background:'rgba(255,255,255,.04)'}}>
+                  {fmt(h.date)}
+                </div>
+              ))}
+              <button onClick={()=>setModal('history')}
+                style={{background:'none',border:'1px solid rgba(255,255,255,.1)',
+                  color:'rgba(255,255,255,.45)',borderRadius:6,padding:'5px 10px',
+                  cursor:'pointer',fontSize:11,width:'100%',marginTop:4}}>
+                All History ({cls.seatingHistory.length})
+              </button>
+            </div>
+          )}
+
+          {/* Sync status */}
+          {FB_READY&&fbUser&&(
+            <div style={{padding:'8px 14px',borderTop:'1px solid rgba(255,255,255,.06)',
+              display:'flex',alignItems:'center',gap:6}}>
+              <div style={{width:6,height:6,borderRadius:'50%',flexShrink:0,
+                background:syncSt==='synced'?'#10b981':syncSt==='syncing'?'#f59e0b':syncSt==='error'?'#ef4444':'#64748b'}}/>
+              <span style={{fontSize:10,color:'rgba(255,255,255,.3)'}}>
+                {syncSt==='synced'?'Saved to cloud':syncSt==='syncing'?'Saving…':syncSt==='error'?'Save error — check connection':'Local only'}
+              </span>
+            </div>
+          )}
+        </aside>
+      )}
+
+      {/* ── Main ── */}
+      <main style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
+        {toolbarVisible&&(
+          <div className="no-print" style={{background:'#fff',borderBottom:'1px solid #e2e8f0',
+            padding:'8px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0,
+            boxShadow:'0 1px 5px rgba(0,0,0,.07)'}}>
+            {cls?(
+              <>
+                <div style={{display:'flex',alignItems:'center',gap:7,minWidth:0}}>
+                  <div style={{width:7,height:7,borderRadius:'50%',background:'#10b981',flexShrink:0}}/>
+                  <span style={{fontWeight:700,fontSize:15.5,color:'#0f172a',
+                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{cls.name}</span>
+                  <button onClick={()=>setModal('rename')}
+                    style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:5,
+                      cursor:'pointer',fontSize:11,padding:'2px 8px',color:'#64748b',flexShrink:0}}>✏️</button>
+                </div>
+                <div style={{flex:1}}/>
+                {last&&<div style={{fontSize:11,color:'#94a3b8',whiteSpace:'nowrap'}}>Last: {last}</div>}
+                <button className="btn btn-ghost" onClick={()=>setModal('history')} style={{fontSize:12.5}}>📅 History</button>
+                <button className="btn btn-ghost" onClick={handleExportCSV} disabled={!cls.currentAssignment} style={{fontSize:12.5}}>⬇ CSV</button>
+                <button className="btn btn-ghost" onClick={()=>window.print()} style={{fontSize:12.5}}>🖨 Print</button>
+                <button className="btn btn-ghost" onClick={toggleFS}
+                  title="Full-screen presentation mode"
+                  style={{fontSize:13,padding:'8px 12px'}}>⛶ Present</button>
+                <button className="btn btn-shuffle" onClick={handleShuffle}
+                  style={{animation:shuffleAnim?'shufflePop .65s ease':'none'}}>
+                  🔀 Shuffle!
+                </button>
+              </>
+            ):(
+              <>
+                <div style={{color:'#94a3b8',fontSize:13.5,flex:1}}>← Select or create a class to get started</div>
+                <button className="btn btn-ghost" onClick={toggleFS} style={{fontSize:13}}>⛶ Present</button>
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{flex:1,overflow:'auto',
+          padding:isFS?'8px':'20px',
+          display:'flex',alignItems:isFS?'center':'flex-start',
+          justifyContent:'center',
+          background:isFS?'#0f172a':'linear-gradient(135deg,#cdd5df 0%,#dde3ea 100%)'}}>
+          <RoomDisplay/>
+        </div>
+      </main>
+
+      {/* ── Right Panel ── */}
+      {panelVisible&&(
+        <aside className="no-print" style={{width:PANEL,background:'#fff',
+          borderLeft:'1px solid #e2e8f0',display:'flex',flexDirection:'column',
+          flexShrink:0,overflow:'hidden',boxShadow:'-2px 0 8px rgba(0,0,0,.05)'}}>
+          <div style={{display:'flex',borderBottom:'1px solid #e2e8f0',flexShrink:0,background:'#f8fafc'}}>
+            {[['students','👥','Students'],['tables','🟦','Tables'],['settings','⚙️','Settings']].map(([tab,icon,lbl])=>(
+              <button key={tab} onClick={()=>setRightTab(tab)}
+                style={{flex:1,padding:'10px 4px',border:'none',cursor:'pointer',fontSize:11.5,
+                  fontWeight:600,background:'transparent',transition:'all .13s',
+                  color:rightTab===tab?'#2563eb':'#64748b',
+                  borderBottom:`2.5px solid ${rightTab===tab?'#2563eb':'transparent'}`,
+                  marginBottom:'-1px'}}>
+                <div style={{fontSize:15,marginBottom:2}}>{icon}</div>{lbl}
+              </button>
+            ))}
+          </div>
+          <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+            {rightTab==='students'&&<StudentsTab cls={cls} updateClass={updateClass}
+              openImport={openImport} clearOpenImport={()=>setOpenImport(false)}/>}
+            {rightTab==='tables'&&<TablesTab cls={cls} updateClass={updateClass}/>}
+            {rightTab==='settings'&&<SettingsTab cls={cls} updateClass={updateClass}/>}
+          </div>
+          <div style={{padding:'9px 14px',borderTop:'1px solid #f1f5f9',background:'#f8fafc',flexShrink:0}}>
+            <div style={{display:'flex'}}>
+              {[[cls.students.length,'#2563eb','Students'],
+                [cls.tables.length,'#10b981','Tables'],
+                [cls.seatingHistory.length,'#f97316','Shuffles'],
+                [cls.students.filter(s=>!cls.constraints.excludedStudents.includes(s.id)).length,'#8b5cf6','Active'],
+              ].map(([v,col,lbl],i,arr)=>(
+                <div key={lbl} style={{flex:1,textAlign:'center',
+                  borderRight:i<arr.length-1?'1px solid #e2e8f0':'none'}}>
+                  <div style={{fontSize:17,fontWeight:800,color:col,lineHeight:1.2}}>{v}</div>
+                  <div style={{fontSize:9,color:'#94a3b8',textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>{lbl}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ── Fullscreen HUD ── */}
+      {isFS&&(
+        <div className="fs-hud no-print">
+          {cls&&(
+            <span style={{color:'rgba(255,255,255,.9)',fontSize:15,fontWeight:700,marginRight:4}}>
+              {cls.name}
+            </span>
+          )}
+          {last&&<span style={{color:'rgba(255,255,255,.4)',fontSize:11,marginRight:6}}>· Last: {last}</span>}
+          {cls&&(
+            <button className="btn btn-shuffle" onClick={handleShuffle}
+              style={{animation:shuffleAnim?'shufflePop .65s ease':'none',fontSize:14,padding:'9px 20px'}}>
+              🔀 Shuffle!
+            </button>
+          )}
+          <button onClick={toggleFS}
+            style={{border:'1px solid rgba(255,255,255,.2)',background:'rgba(255,255,255,.08)',
+              color:'rgba(255,255,255,.7)',borderRadius:7,padding:'8px 14px',cursor:'pointer',
+              fontSize:13,fontWeight:600}}>
+            ✕ Exit
+          </button>
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+      {modal==='newClass'&&<NewClassModal onSave={createClass} onClose={()=>setModal(null)}/>}
+      {modal==='rename'&&cls&&<RenameModal current={cls.name} onSave={renameClass} onClose={()=>setModal(null)}/>}
+      {modal==='history'&&cls&&(
+        <HistoryModal cls={cls} onClose={()=>setModal(null)}
+          onRestore={e=>updateClass(c=>({...c,currentAssignment:e.assignment}))}/>
+      )}
+
+      <style>{`
+        @keyframes shufflePop{
+          0%{transform:scale(1) rotate(0deg)}
+          25%{transform:scale(1.14) rotate(-3deg)}
+          55%{transform:scale(.93) rotate(2deg)}
+          80%{transform:scale(1.04) rotate(-1deg)}
+          100%{transform:scale(1) rotate(0deg)}
+        }
+        @media print{
+          .no-print{display:none!important;}
+          body{overflow:visible!important;height:auto!important;background:#fff!important;}
+          .print-hdr{display:block!important;}
+          main{overflow:visible!important;}
+        }
+      `}</style>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
