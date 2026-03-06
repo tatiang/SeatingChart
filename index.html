@@ -226,53 +226,68 @@ function chairPositions(x,y,w,h,n){
 }
 
 // ── Drag + click ───────────────────────────────────────────────────────────────
-function useDrag(cls,updateClass,roomScale){
+function useDrag(cls,updateClass,roomScale,toggleOrient){
   const dr=useRef(null);
   const rs=useRef(roomScale);
+  const clsRef=useRef(cls);
+  const updateRef=useRef(updateClass);
+  const toggleRef=useRef(toggleOrient);
   useEffect(()=>{rs.current=roomScale;},[roomScale]);
+  useEffect(()=>{clsRef.current=cls;},[cls]);
+  useEffect(()=>{updateRef.current=updateClass;},[updateClass]);
+  useEffect(()=>{toggleRef.current=toggleOrient;},[toggleOrient]);
+
+  useEffect(()=>{
+    const onMove=(e)=>{
+      if(!dr.current)return;
+      const{type,id,sx,sy,ox,oy}=dr.current;
+      const dx=(e.clientX-sx)/rs.current, dy=(e.clientY-sy)/rs.current;
+      if(!dr.current.moved&&Math.hypot(e.clientX-sx,e.clientY-sy)<5)return;
+      dr.current.moved=true;
+      const c=clsRef.current;
+      const size=c.tableSize||'sm';
+      if(type==='table'){
+        const t=c.tables.find(t=>t.id===id);
+        const w=tw(t.orientation,size),h=th(t.orientation,size);
+        updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id
+          ?{...t,x:Math.max(0,Math.min(PW-w,ox+dx)),y:Math.max(0,Math.min(PH-h,oy+dy))}:t)}));
+      }else if(type==='furniture'){
+        const f=(c.furniture||[]).find(f=>f.id===id);
+        if(f){const fd=FURN[f.type]||{w:34,h:34};
+          updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id
+            ?{...fi,x:Math.max(0,Math.min(PW-fd.w,ox+dx)),y:Math.max(0,Math.min(PH-fd.h,oy+dy))}:fi)}));}
+      }else{
+        const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
+        const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
+        updateRef.current(cl=>({...cl,screen:{...cl.screen,
+          x:Math.max(0,Math.min(PW-sw2,ox+dx)),
+          y:Math.max(0,Math.min(PH-sh2,oy+dy))}}));
+      }
+    };
+    const onUp=(e)=>{
+      if(!dr.current)return;
+      if(!dr.current.moved&&toggleRef.current)toggleRef.current(dr.current.type,dr.current.id);
+      dr.current=null;
+    };
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+    return()=>{
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+    };
+  },[]);
 
   const onDown=useCallback((e,type,id)=>{
     e.preventDefault();e.stopPropagation();
+    const c=clsRef.current;
     let ox=0,oy=0;
-    if(type==='table'){const t=cls.tables.find(t=>t.id===id);ox=t.x;oy=t.y;}
-    else if(type==='furniture'){const f=(cls.furniture||[]).find(f=>f.id===id);if(f){ox=f.x;oy=f.y;}}
-    else{ox=cls.screen.x;oy=cls.screen.y;}
+    if(type==='table'){const t=c.tables.find(t=>t.id===id);ox=t.x;oy=t.y;}
+    else if(type==='furniture'){const f=(c.furniture||[]).find(f=>f.id===id);if(f){ox=f.x;oy=f.y;}}
+    else{ox=c.screen.x;oy=c.screen.y;}
     dr.current={type,id,moved:false,sx:e.clientX,sy:e.clientY,ox,oy};
-  },[cls]);
-
-  const onMove=useCallback((e)=>{
-    if(!dr.current)return;
-    const{type,id,sx,sy,ox,oy}=dr.current;
-    const dx=(e.clientX-sx)/rs.current, dy=(e.clientY-sy)/rs.current;
-    if(!dr.current.moved&&Math.hypot(e.clientX-sx,e.clientY-sy)<5)return;
-    dr.current.moved=true;
-    const size=cls.tableSize||'sm';
-    if(type==='table'){
-      const t=cls.tables.find(t=>t.id===id);
-      const w=tw(t.orientation,size),h=th(t.orientation,size);
-      updateClass(c=>({...c,tables:c.tables.map(t=>t.id===id
-        ?{...t,x:Math.max(0,Math.min(PW-w,ox+dx)),y:Math.max(0,Math.min(PH-h,oy+dy))}:t)}));
-    }else if(type==='furniture'){
-      const f=(cls.furniture||[]).find(f=>f.id===id);
-      if(f){const fd=FURN[f.type]||{w:34,h:34};
-        updateClass(c=>({...c,furniture:(c.furniture||[]).map(fi=>fi.id===id
-          ?{...fi,x:Math.max(0,Math.min(PW-fd.w,ox+dx)),y:Math.max(0,Math.min(PH-fd.h,oy+dy))}:fi)}));}
-    }else{
-      const sw2=cls.screen.orientation==='H'?SCR_W:SCR_H;
-      const sh2=cls.screen.orientation==='H'?SCR_H:SCR_W;
-      updateClass(c=>({...c,screen:{...c.screen,
-        x:Math.max(0,Math.min(PW-sw2,ox+dx)),
-        y:Math.max(0,Math.min(PH-sh2,oy+dy))}}));
-    }
-  },[cls,updateClass]);
-
-  const onUp=useCallback((e,onClickFn)=>{
-    if(!dr.current)return;
-    if(!dr.current.moved&&onClickFn)onClickFn(dr.current.type,dr.current.id);
-    dr.current=null;
   },[]);
 
-  return{onDown,onMove,onUp};
+  return{onDown};
 }
 
 // ── RoomCanvas ─────────────────────────────────────────────────────────────────
@@ -298,8 +313,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
     updateClass(c=>({...c,furniture:(c.furniture||[]).filter(f=>f.id!==id)}));
   },[updateClass]);
 
-  const{onDown,onMove,onUp}=useDrag(cls,updateClass,roomScale);
-  const handleUp=useCallback((e)=>onUp(e,toggleOrient),[onUp,toggleOrient]);
+  const{onDown}=useDrag(cls,updateClass,roomScale,toggleOrient);
 
   const scr=cls.screen;
   const scrW=scr.orientation==='H'?SCR_W:SCR_H;
@@ -307,9 +321,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
   const furniture=cls.furniture||[];
 
   return(
-    <div onMouseMove={readOnly?null:onMove} onMouseUp={readOnly?null:handleUp}
-      onMouseLeave={readOnly?null:handleUp}
-      style={{width:PW,height:PH,position:'relative',userSelect:'none',
+    <div style={{width:PW,height:PH,position:'relative',userSelect:'none',
         border:'2.5px solid #8b6c42',borderRadius:6,overflow:'hidden',
         backgroundColor:'#c8955a',
         backgroundImage:[
