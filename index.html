@@ -118,6 +118,8 @@ const TDARKS =['#1d4ed8','#059669','#c2410c','#7c3aed','#b91c1c','#0891b2','#d97
 const GCOLOR ={M:'#3b82f6',F:'#ec4899',NB:'#8b5cf6','':'#94a3b8',X:'#8b5cf6'};
 
 const STORAGE='seatplan-v8';
+const ROSTER_SHEET_ID='1uvuCvkcqCLXokBlRlHJTtqE6S2UpMP-mKQbuyTBaws4';
+const GRADE_MAP={'kindergarten':'K','first grade':'1','second grade':'2','third grade':'3','fourth grade':'4','fifth grade':'5','sixth grade':'6'};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const shuffle=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 const fmt=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
@@ -1006,6 +1008,141 @@ function SchoolNotesPanel({cls,fbUser}){
   );
 }
 
+// ── RosterPanel ────────────────────────────────────────────────────────────────
+async function getSheetsToken(userEmail){
+  const provider=new firebase.auth.GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
+  if(userEmail)provider.setCustomParameters({login_hint:userEmail,hd:'markdayschool.org'});
+  const result=await firebase.auth().signInWithPopup(provider);
+  return result.credential?.accessToken||null;
+}
+
+async function fetchAllRosters(token){
+  const BASE='https://sheets.googleapis.com/v4/spreadsheets';
+  const h={Authorization:`Bearer ${token}`};
+  const metaRes=await fetch(`${BASE}/${ROSTER_SHEET_ID}?fields=sheets.properties`,{headers:h});
+  if(!metaRes.ok)throw new Error(`Sheets API error ${metaRes.status} — try signing in again`);
+  const meta=await metaRes.json();
+  const classes=[];
+  for(const sheet of(meta.sheets||[])){
+    const title=sheet.properties.title;
+    const grade=GRADE_MAP[title.toLowerCase()];
+    if(!grade)continue;
+    const valRes=await fetch(`${BASE}/${ROSTER_SHEET_ID}/values/${encodeURIComponent(title)}`,{headers:h});
+    if(!valRes.ok)continue;
+    const{values:rows=[]}=await valRes.json();
+    // Find the teacher row (first row containing a cell starting with "Teacher:")
+    let teacherRowIdx=-1;
+    for(let i=0;i<Math.min(rows.length,8);i++){
+      if((rows[i]||[]).some(c=>c&&/^Teacher:/i.test(c))){teacherRowIdx=i;break;}
+    }
+    if(teacherRowIdx<0)continue;
+    const teacherRow=rows[teacherRowIdx];
+    const numCols=Math.max(...rows.map(r=>(r||[]).length));
+    for(let col=0;col<numCols;col++){
+      const teacherCell=(teacherRow[col]||'').trim();
+      if(!/^Teacher:/i.test(teacherCell))continue;
+      const teacherName=teacherCell.replace(/^Teacher:\s*/i,'').trim();
+      const lastName=teacherName.split(' ').pop();
+      const code=`${grade}${lastName[0].toUpperCase()}`;
+      // Students start 2 rows after teacher row (skipping support teacher row)
+      const students=[];
+      for(let r=teacherRowIdx+2;r<rows.length;r++){
+        const cell=((rows[r]||[])[col]||'').trim();
+        if(!cell||/^bold\s*=/i.test(cell))continue;
+        students.push(cell);
+      }
+      if(students.length>0)classes.push({code,teacher:teacherName,grade:title,students});
+    }
+  }
+  return classes;
+}
+
+function RosterPanel({fbUser,createClassFromRoster}){
+  const[rosters,setRosters]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState('');
+  const[imported,setImported]=useState({});
+  const tokenRef=useRef(null);
+
+  const loadRosters=async()=>{
+    setLoading(true);setError('');
+    try{
+      if(!tokenRef.current)tokenRef.current=await getSheetsToken(fbUser?.email);
+      setRosters(await fetchAllRosters(tokenRef.current));
+    }catch(e){
+      setError(e.message||'Failed to load. Please try again.');
+      tokenRef.current=null;
+    }
+    setLoading(false);
+  };
+
+  const doImport=r=>{
+    createClassFromRoster(r.code,r.students);
+    setImported(p=>({...p,[r.code]:true}));
+  };
+
+  const gradeOrder=['K','1','2','3','4','5','6'];
+  const grouped={};
+  (rosters||[]).forEach(r=>{if(!grouped[r.grade])grouped[r.grade]=[];grouped[r.grade].push(r);});
+  const sortedGrades=Object.keys(grouped).sort((a,b)=>{
+    const gi=s=>gradeOrder.indexOf(GRADE_MAP[s.toLowerCase()]??s);
+    return gi(a)-gi(b);
+  });
+
+  return(
+    <div style={{flex:1,overflow:'auto',display:'flex',flexDirection:'column',padding:14}}>
+      <div style={{marginBottom:10,display:'flex',alignItems:'center',gap:8}}>
+        <div style={{flex:1,fontSize:11.5,fontWeight:700,color:'#5c4a32'}}>School Class Lists</div>
+        <button onClick={loadRosters} disabled={loading}
+          style={{fontSize:10.5,padding:'5px 12px',border:'none',borderRadius:6,cursor:'pointer',
+            background:'#c8955a',color:'#fff',fontWeight:600,opacity:loading?0.7:1}}>
+          {loading?'⏳ Loading…':rosters?'🔄 Refresh':'📋 Load'}
+        </button>
+      </div>
+      {error&&<div style={{fontSize:11,color:'#dc2626',background:'#fef2f2',
+        padding:'7px 10px',borderRadius:6,marginBottom:8}}>{error}</div>}
+      {!rosters&&!loading&&!error&&(
+        <div style={{fontSize:12,color:'#94a3b8',textAlign:'center',paddingTop:30,lineHeight:1.7}}>
+          Click <strong>Load</strong> to pull class lists<br/>from the school Google Sheet.<br/>
+          <span style={{fontSize:10.5,color:'#c4b5a5'}}>You'll approve Sheets access once.</span>
+        </div>
+      )}
+      {rosters&&sortedGrades.length===0&&(
+        <div style={{fontSize:12,color:'#94a3b8',textAlign:'center',paddingTop:20}}>No classes found.</div>
+      )}
+      {sortedGrades.map(grade=>(
+        <div key={grade} style={{marginBottom:10}}>
+          <div style={{fontSize:10,fontWeight:700,color:'#8b6c42',textTransform:'uppercase',
+            letterSpacing:1,marginBottom:4,borderBottom:'1px solid #e8ddd0',paddingBottom:2}}>{grade}</div>
+          {grouped[grade].map(r=>(
+            <div key={r.code} style={{display:'flex',alignItems:'center',padding:'6px 8px',
+              borderRadius:6,marginBottom:3,
+              background:imported[r.code]?'#f0fdf4':'#faf7f2',
+              border:`1px solid ${imported[r.code]?'#86efac':'#e8ddd0'}`}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#374151'}}>{r.code}</div>
+                <div style={{fontSize:10.5,color:'#64748b',overflow:'hidden',
+                  textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.teacher} · {r.students.length} students</div>
+              </div>
+              {imported[r.code]
+                ?<div style={{fontSize:11,color:'#16a34a',fontWeight:600,marginLeft:6}}>✓ Imported</div>
+                :<button onClick={()=>doImport(r)}
+                  style={{fontSize:10.5,padding:'4px 10px',border:'none',borderRadius:5,
+                    cursor:'pointer',background:'#c8955a',color:'#fff',fontWeight:600,
+                    flexShrink:0,marginLeft:6}}>Import</button>
+              }
+            </div>
+          ))}
+        </div>
+      ))}
+      {rosters&&<div style={{fontSize:10,color:'#94a3b8',textAlign:'center',marginTop:6}}>
+        {rosters.length} classes · K–4 Class Lists 2025–2026
+      </div>}
+    </div>
+  );
+}
+
 // ── ShareModal ─────────────────────────────────────────────────────────────────
 function ShareModal({cls,fbUser,onClose}){
   const[code,setCode]=useState('');
@@ -1360,6 +1497,12 @@ function App(){
     setData(prev=>({...prev,classes:[...prev.classes,nc],activeClassId:nc.id}));
     setModal(null);setRightTab('students');setOpenImport(true);
   };
+  const createClassFromRoster=useCallback((code,studentNames)=>{
+    const nc=mkClass(code);
+    nc.students=studentNames.map(name=>({id:uid(),name,gender:'',photoURL:'',notes:''}));
+    setData(prev=>({...prev,classes:[...prev.classes,nc],activeClassId:nc.id}));
+    setRightTab('students');
+  },[]);
   const deleteClass=id=>{
     if(!window.confirm('Delete this class and all its data?'))return;
     setData(prev=>{const rest=prev.classes.filter(c=>c.id!==id);
@@ -1644,7 +1787,7 @@ function App(){
           borderLeft:'1px solid #e8ddd0',display:'flex',flexDirection:'column',
           flexShrink:0,overflow:'hidden',boxShadow:'-2px 0 8px rgba(139,108,66,.08)'}}>
           <div style={{display:'flex',borderBottom:'1px solid #e8ddd0',flexShrink:0,background:'#faf7f2'}}>
-            {[['students','👥','Students'],['tables','🟦','Tables'],['settings','⚙️','Settings'],['notes','📝','Notes']].map(([tab,icon,lbl])=>(
+            {[['students','👥','Students'],['tables','🟦','Tables'],['settings','⚙️','Settings'],['notes','📝','Notes'],['roster','🏫','Roster']].map(([tab,icon,lbl])=>(
               <button key={tab} onClick={()=>setRightTab(tab)}
                 style={{flex:1,padding:'9px 3px',border:'none',cursor:'pointer',fontSize:10.5,
                   fontWeight:600,background:'transparent',transition:'all .13s',
@@ -1661,6 +1804,7 @@ function App(){
             {rightTab==='tables'&&<TablesTab cls={cls} updateClass={updateClass}/>}
             {rightTab==='settings'&&<SettingsTab cls={cls} updateClass={updateClass}/>}
             {rightTab==='notes'&&<SchoolNotesPanel cls={cls} fbUser={fbUser}/>}
+            {rightTab==='roster'&&<RosterPanel fbUser={fbUser} createClassFromRoster={createClassFromRoster}/>}
           </div>
           <div style={{padding:'9px 14px',borderTop:'1px solid #e8ddd0',background:'#faf7f2',flexShrink:0}}>
             <div style={{display:'flex'}}>
