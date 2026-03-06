@@ -217,14 +217,26 @@ function parseStudents(text){
 function chairPositions(x,y,w,h,n){
   if(!n)return[];
   const pad=10;
-  const perim=2*(w+h);
-  return Array.from({length:n},(_,i)=>{
-    const dist=(i+0.5)*perim/n;
-    if(dist<=w)        return{cx:x+dist,           cy:y-pad};
-    if(dist<=w+h)      return{cx:x+w+pad,           cy:y+(dist-w)};
-    if(dist<=2*w+h)    return{cx:x+w-(dist-w-h),    cy:y+h+pad};
-                       return{cx:x-pad,              cy:y+h-(dist-2*w-h)};
-  });
+  const perLong=Math.floor(n/2);
+  const rem=n%2;
+  const chairs=[];
+  const landscape=w>=h; // top/bottom are long sides
+  if(landscape){
+    // top row
+    for(let i=0;i<perLong;i++)chairs.push({cx:x+w*(i+1)/(perLong+1),cy:y-pad});
+    // bottom row
+    for(let i=0;i<perLong;i++)chairs.push({cx:x+w*(i+1)/(perLong+1),cy:y+h+pad});
+    // remainder at left end
+    if(rem)chairs.push({cx:x-pad,cy:y+h/2});
+  }else{
+    // left column
+    for(let i=0;i<perLong;i++)chairs.push({cx:x-pad,cy:y+h*(i+1)/(perLong+1)});
+    // right column
+    for(let i=0;i<perLong;i++)chairs.push({cx:x+w+pad,cy:y+h*(i+1)/(perLong+1)});
+    // remainder at top end
+    if(rem)chairs.push({cx:x+w/2,cy:y-pad});
+  }
+  return chairs;
 }
 
 // ── Drag + click ───────────────────────────────────────────────────────────────
@@ -473,7 +485,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
 }
 
 // ── StudentsTab ─────────────────────────────────────────────────────────────────
-function StudentsTab({cls,updateClass,openImport,clearOpenImport}){
+function StudentsTab({cls,updateClass,openImport,clearOpenImport,fbUser}){
   const[newName,setNewName]=useState('');
   const[newGender,setNewGender]=useState('');
   const[importText,setImportText]=useState('');
@@ -490,14 +502,22 @@ function StudentsTab({cls,updateClass,openImport,clearOpenImport}){
     updateClass(c=>({...c,students:[...c.students,{id:uid(),name,gender:newGender,photoURL:'',notes:''}]}));
     setNewName('');setNewGender('');
   };
-  const remove=id=>updateClass(c=>({...c,
-    students:c.students.filter(s=>s.id!==id),
-    constraints:{...c.constraints,
-      excludedStudents:c.constraints.excludedStudents.filter(x=>x!==id),
-      keepApart:c.constraints.keepApart.filter(p=>!p.includes(id))}}));
-  const setG=(id,g)=>updateClass(c=>({...c,students:c.students.map(s=>s.id===id?{...s,gender:g}:s)}));
+  const remove=id=>{
+    const s=cls.students.find(x=>x.id===id);
+    if(!window.confirm(`Remove ${s?.name||'this student'} from the class?`))return;
+    updateClass(c=>({...c,
+      students:c.students.filter(s=>s.id!==id),
+      constraints:{...c.constraints,
+        excludedStudents:c.constraints.excludedStudents.filter(x=>x!==id),
+        keepApart:c.constraints.keepApart.filter(p=>!p.includes(id))}}));
+  };
+  const GORDER=['','M','F','NB'];
+  const cycleGender=(id,cur)=>{const next=GORDER[(GORDER.indexOf(cur)+1)%GORDER.length];updateClass(c=>({...c,students:c.students.map(s=>s.id===id?{...s,gender:next}:s)}));};
   const setPhoto=(id,v)=>updateClass(c=>({...c,students:c.students.map(s=>s.id===id?{...s,photoURL:v}:s)}));
-  const setNotes=(id,v)=>updateClass(c=>({...c,students:c.students.map(s=>s.id===id?{...s,notes:v}:s)}));
+  const setNotes=(id,v,fbUser)=>{
+    const entry=v.trim()?{text:v.trim(),author:fbUser?.displayName||fbUser?.email||'',date:new Date().toISOString()}:null;
+    updateClass(c=>({...c,students:c.students.map(s=>s.id===id?{...s,noteMeta:entry,notes:v}:s)}));
+  };
 
   const doImport=()=>{
     const parsed=parseStudents(importText);if(!parsed.length)return;
@@ -602,28 +622,40 @@ function StudentsTab({cls,updateClass,openImport,clearOpenImport}){
         {cls.students.map(s=>{
           const excl=cls.constraints.excludedStudents.includes(s.id);
           const isExp=expanded===s.id;
+          const gc=GCOLOR[s.gender]||GCOLOR[''];
+          const gLabel=s.gender||'·';
+          const noteText=typeof s.notes==='string'?s.notes:'';
+          const noteMeta=s.noteMeta||null;
           return(
             <div key={s.id} style={{borderRadius:7,border:'1px solid',
               borderColor:excl?'#fde68a':isExp?'#bfdbfe':'#e2e8f0',
               background:excl?'#fffbeb':isExp?'#f0f7ff':'#fff',
               overflow:'hidden',transition:'all .12s'}}>
-              <div style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px',cursor:'pointer'}}
-                onClick={()=>setExpanded(isExp?null:s.id)}>
+              <div style={{display:'flex',alignItems:'center',gap:5,padding:'5px 8px'}}>
                 {/* avatar */}
                 {s.photoURL
-                  ?<img src={s.photoURL} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:`1.5px solid ${GCOLOR[s.gender]||GCOLOR['']}`}} onError={e=>e.target.style.display='none'}/>
-                  :<div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,
-                    background:GCOLOR[s.gender]||GCOLOR[''],
+                  ?<img src={s.photoURL} alt="" style={{width:22,height:22,borderRadius:'50%',objectFit:'cover',flexShrink:0,border:`1.5px solid ${gc}`}} onError={e=>e.target.style.display='none'}/>
+                  :<div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,background:gc,
                     display:'flex',alignItems:'center',justifyContent:'center',
                     fontSize:10,fontWeight:700,color:'#fff'}}>
                     {s.name[0]?.toUpperCase()||'?'}
                   </div>}
-                <GenderPill value={s.gender} name={`g-${s.id}`} onChange={g=>{setG(s.id,g);}}/>
+                {/* gender cycle button */}
+                <button onClick={()=>cycleGender(s.id,s.gender)} title="Click to cycle gender"
+                  style={{border:'none',borderRadius:4,cursor:'pointer',
+                    padding:'2px 6px',fontSize:10,fontWeight:700,color:'#fff',
+                    background:gc,flexShrink:0,minWidth:24,transition:'background .15s'}}>
+                  {gLabel}
+                </button>
                 <span style={{flex:1,fontSize:13,fontWeight:500,color:'#1e293b',
                   overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
-                {s.notes&&<span title="Has private notes" style={{fontSize:11,flexShrink:0}}>✎</span>}
                 {excl&&<span style={{fontSize:9,color:'#b45309',fontWeight:700,flexShrink:0}}>OUT</span>}
-                <span style={{fontSize:10,color:'#94a3b8',flexShrink:0}}>{isExp?'▾':'▸'}</span>
+                {/* details button */}
+                <button onClick={()=>setExpanded(isExp?null:s.id)} title="Edit photo & notes"
+                  style={{border:'none',background:'none',color:noteText?'#c8955a':'#94a3b8',
+                    cursor:'pointer',fontSize:13,lineHeight:1,padding:'0 3px',flexShrink:0}}>
+                  {noteText?'✎':'⋯'}
+                </button>
                 <button onClick={e=>{e.stopPropagation();remove(s.id);}}
                   style={{border:'none',background:'none',color:'#cbd5e1',cursor:'pointer',
                     fontSize:16,lineHeight:1,padding:'0 2px',flexShrink:0}}>×</button>
@@ -640,8 +672,11 @@ function StudentsTab({cls,updateClass,openImport,clearOpenImport}){
                   <div>
                     <div className="section-lbl" style={{marginBottom:4}}>My Private Notes</div>
                     <textarea className="input" placeholder="Notes visible only to you…"
-                      value={s.notes||''} onChange={e=>setNotes(s.id,e.target.value)}
+                      value={noteText} onChange={e=>setNotes(s.id,e.target.value,fbUser)}
                       rows={2} style={{fontSize:12,padding:'6px 9px'}}/>
+                    {noteMeta&&<div style={{fontSize:10,color:'#94a3b8',marginTop:3}}>
+                      Last edited by <strong>{noteMeta.author}</strong> · {fmt(noteMeta.date)}
+                    </div>}
                   </div>
                 </div>
               )}
@@ -1058,8 +1093,11 @@ async function fetchAllRosters(token){
   return classes;
 }
 
+const ROSTER_CACHE='rosterCache_v1';
 function RosterPanel({fbUser,createClassFromRoster}){
-  const[rosters,setRosters]=useState(null);
+  const[rosters,setRosters]=useState(()=>{
+    try{const c=JSON.parse(localStorage.getItem(ROSTER_CACHE)||'null');return c?.data||null;}catch{return null;}
+  });
   const[loading,setLoading]=useState(false);
   const[error,setError]=useState('');
   const[imported,setImported]=useState({});
@@ -1069,7 +1107,9 @@ function RosterPanel({fbUser,createClassFromRoster}){
     setLoading(true);setError('');
     try{
       if(!tokenRef.current)tokenRef.current=await getSheetsToken(fbUser?.email);
-      setRosters(await fetchAllRosters(tokenRef.current));
+      const data=await fetchAllRosters(tokenRef.current);
+      setRosters(data);
+      localStorage.setItem(ROSTER_CACHE,JSON.stringify({data,ts:Date.now()}));
     }catch(e){
       setError(e.message||'Failed to load. Please try again.');
       tokenRef.current=null;
@@ -1097,14 +1137,14 @@ function RosterPanel({fbUser,createClassFromRoster}){
         <button onClick={loadRosters} disabled={loading}
           style={{fontSize:10.5,padding:'5px 12px',border:'none',borderRadius:6,cursor:'pointer',
             background:'#c8955a',color:'#fff',fontWeight:600,opacity:loading?0.7:1}}>
-          {loading?'⏳ Loading…':rosters?'🔄 Refresh':'📋 Load'}
+          {loading?'⏳ Loading…':'🔄 Refresh'}
         </button>
       </div>
       {error&&<div style={{fontSize:11,color:'#dc2626',background:'#fef2f2',
         padding:'7px 10px',borderRadius:6,marginBottom:8}}>{error}</div>}
       {!rosters&&!loading&&!error&&(
         <div style={{fontSize:12,color:'#94a3b8',textAlign:'center',paddingTop:30,lineHeight:1.7}}>
-          Click <strong>Load</strong> to pull class lists<br/>from the school Google Sheet.<br/>
+          Click <strong>Refresh</strong> to pull class lists<br/>from the school Google Sheet.<br/>
           <span style={{fontSize:10.5,color:'#c4b5a5'}}>You'll approve Sheets access once.</span>
         </div>
       )}
@@ -1413,6 +1453,7 @@ function App(){
   const[modal,setModal]=useState(null);
   const[shuffleAnim,setShuffleAnim]=useState(false);
   const[openImport,setOpenImport]=useState(false);
+  const[showExport,setShowExport]=useState(false);
   const[isFS,setIsFS]=useState(false);
   const[winW,setWinW]=useState(window.innerWidth);
   const[winH,setWinH]=useState(window.innerHeight);
@@ -1749,12 +1790,29 @@ function App(){
                 <div style={{flex:1}}/>
                 {last&&<div style={{fontSize:11,color:'#94a3b8',whiteSpace:'nowrap'}}>Last: {last}</div>}
                 <button className="btn btn-ghost" onClick={()=>setModal('history')} style={{fontSize:12.5}}>📅 History</button>
-                <button className="btn btn-ghost" onClick={handleExportCSV} disabled={!cls.currentAssignment} style={{fontSize:12.5}}>⬇ CSV</button>
-                <button className="btn btn-ghost" onClick={()=>window.print()} style={{fontSize:12.5}}>🖨 Print</button>
-                {fbDb&&fbUser&&(
-                  <button className="btn btn-ghost" onClick={()=>setModal('share')}
-                    style={{fontSize:12.5,borderColor:'#c8955a',color:'#78614a'}}>🔗 Share</button>
-                )}
+                <div style={{position:'relative',flexShrink:0}}>
+                  <button className="btn btn-ghost" onClick={()=>setShowExport(v=>!v)}
+                    style={{fontSize:12.5}}>⬆ Export</button>
+                  {showExport&&(
+                    <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,
+                      background:'#fff',border:'1px solid #e2e8f0',borderRadius:7,
+                      boxShadow:'0 4px 16px rgba(0,0,0,.12)',zIndex:200,overflow:'hidden',minWidth:120}}>
+                      {[
+                        ['⬇ CSV',()=>{handleExportCSV();setShowExport(false);},(!!cls.currentAssignment)],
+                        ['🖨 Print',()=>{window.print();setShowExport(false);},true],
+                        ...(fbDb&&fbUser?[['🔗 Share',()=>{setModal('share');setShowExport(false);},true]]:[]),
+                      ].map(([lbl,fn,enabled])=>(
+                        <button key={lbl} onClick={fn} disabled={!enabled}
+                          style={{display:'block',width:'100%',border:'none',background:'none',
+                            cursor:enabled?'pointer':'default',fontSize:12.5,padding:'9px 14px',
+                            textAlign:'left',color:enabled?'#1e293b':'#94a3b8',
+                            transition:'background .1s'}}
+                          onMouseEnter={e=>enabled&&(e.target.style.background='#f8f4f0')}
+                          onMouseLeave={e=>e.target.style.background='none'}>{lbl}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button className="btn btn-ghost" onClick={toggleFS}
                   title="Full-screen presentation mode"
                   style={{fontSize:13,padding:'8px 12px'}}>⛶ Present</button>
@@ -1799,7 +1857,7 @@ function App(){
             ))}
           </div>
           <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
-            {rightTab==='students'&&<StudentsTab cls={cls} updateClass={updateClass}
+            {rightTab==='students'&&<StudentsTab cls={cls} updateClass={updateClass} fbUser={fbUser}
               openImport={openImport} clearOpenImport={()=>setOpenImport(false)}/>}
             {rightTab==='tables'&&<TablesTab cls={cls} updateClass={updateClass}/>}
             {rightTab==='settings'&&<SettingsTab cls={cls} updateClass={updateClass}/>}
