@@ -26,14 +26,29 @@ npm install -g firebase-tools
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Each teacher's private data (classes, students, seating history)
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null
                          && request.auth.uid == userId;
+    }
+
+    // Shared class snapshots — any signed-in user can read; only signed-in users can write
+    match /sharedClasses/{code} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // School-wide student notes — any signed-in user can read and write
+    match /schoolNotes/{domain}/students/{student} {
+      allow read, write: if request.auth != null;
     }
   }
 }
 ```
    Click **Publish**.
+
+> **Note:** If you previously set up Firestore with the v1 rules (users only), you must update the rules to enable the **Share** button and the **📝 Notes** tab. Just replace the entire rules block with the version above and click Publish.
 
 ### Step 3 — Get your Firebase config
 
