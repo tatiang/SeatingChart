@@ -240,68 +240,67 @@ function chairPositions(x,y,w,h,n){
 }
 
 // ── Drag + click ───────────────────────────────────────────────────────────────
-function useDrag(cls,updateClass,roomScale,toggleOrient){
+function useDrag(cls,updateClass,toggleOrient){
   const dr=useRef(null);
-  const rs=useRef(roomScale);
+  const roomRef=useRef(null);   // ref to the room div — used for pointer capture
   const clsRef=useRef(cls);
   const updateRef=useRef(updateClass);
   const toggleRef=useRef(toggleOrient);
-  useEffect(()=>{rs.current=roomScale;},[roomScale]);
   useEffect(()=>{clsRef.current=cls;},[cls]);
   useEffect(()=>{updateRef.current=updateClass;},[updateClass]);
   useEffect(()=>{toggleRef.current=toggleOrient;},[toggleOrient]);
 
-  useEffect(()=>{
-    const onMove=(e)=>{
-      if(!dr.current)return;
-      const{type,id,sx,sy,ox,oy}=dr.current;
-      const dx=(e.clientX-sx)/rs.current, dy=(e.clientY-sy)/rs.current;
-      if(!dr.current.moved&&Math.hypot(e.clientX-sx,e.clientY-sy)<5)return;
-      dr.current.moved=true;
-      const c=clsRef.current;
-      const size=c.tableSize||'sm';
-      if(type==='table'){
-        const t=c.tables.find(t=>t.id===id);
-        const w=tw(t.orientation,size),h=th(t.orientation,size);
-        updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id
-          ?{...t,x:Math.max(0,Math.min(PW-w,ox+dx)),y:Math.max(0,Math.min(PH-h,oy+dy))}:t)}));
-      }else if(type==='furniture'){
-        const f=(c.furniture||[]).find(f=>f.id===id);
-        if(f){const fd=FURN[f.type]||{w:34,h:34};
-          updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id
-            ?{...fi,x:Math.max(0,Math.min(PW-fd.w,ox+dx)),y:Math.max(0,Math.min(PH-fd.h,oy+dy))}:fi)}));}
-      }else{
-        const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
-        const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
-        updateRef.current(cl=>({...cl,screen:{...cl.screen,
-          x:Math.max(0,Math.min(PW-sw2,ox+dx)),
-          y:Math.max(0,Math.min(PH-sh2,oy+dy))}}));
-      }
-    };
-    const onUp=(e)=>{
-      if(!dr.current)return;
-      if(!dr.current.moved&&toggleRef.current)toggleRef.current(dr.current.type,dr.current.id);
-      dr.current=null;
-    };
-    document.addEventListener('mousemove',onMove);
-    document.addEventListener('mouseup',onUp);
-    return()=>{
-      document.removeEventListener('mousemove',onMove);
-      document.removeEventListener('mouseup',onUp);
-    };
-  },[]);
+  // Compute the true CSS scale by comparing the room div's rendered width to PW
+  const getScale=()=>{
+    if(!roomRef.current)return 1;
+    return roomRef.current.getBoundingClientRect().width/PW;
+  };
 
   const onDown=useCallback((e,type,id)=>{
-    e.preventDefault();e.stopPropagation();
+    e.preventDefault();
     const c=clsRef.current;
     let ox=0,oy=0;
-    if(type==='table'){const t=c.tables.find(t=>t.id===id);ox=t.x;oy=t.y;}
-    else if(type==='furniture'){const f=(c.furniture||[]).find(f=>f.id===id);if(f){ox=f.x;oy=f.y;}}
+    if(type==='table'){const t=c.tables.find(t=>t.id===id);if(!t)return;ox=t.x;oy=t.y;}
+    else if(type==='furniture'){const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;ox=f.x;oy=f.y;}
     else{ox=c.screen.x;oy=c.screen.y;}
-    dr.current={type,id,moved:false,sx:e.clientX,sy:e.clientY,ox,oy};
+    dr.current={type,id,moved:false,sx:e.clientX,sy:e.clientY,ox,oy,scale:getScale()};
+    // Capture pointer on the room div so move/up events keep firing even outside the room
+    if(roomRef.current&&e.pointerId!=null)roomRef.current.setPointerCapture(e.pointerId);
   },[]);
 
-  return{onDown};
+  const onMove=useCallback((e)=>{
+    if(!dr.current)return;
+    const{type,id,sx,sy,ox,oy,scale}=dr.current;
+    const dx=(e.clientX-sx)/scale, dy=(e.clientY-sy)/scale;
+    if(!dr.current.moved&&Math.hypot(dx,dy)<4)return;
+    dr.current.moved=true;
+    const c=clsRef.current;
+    const size=c.tableSize||'sm';
+    if(type==='table'){
+      const t=c.tables.find(t=>t.id===id);if(!t)return;
+      const w=tw(t.orientation,size),h=th(t.orientation,size);
+      updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id
+        ?{...t,x:Math.max(0,Math.min(PW-w,ox+dx)),y:Math.max(0,Math.min(PH-h,oy+dy))}:t)}));
+    }else if(type==='furniture'){
+      const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;
+      const fd=FURN[f.type]||{w:34,h:34};
+      updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id
+        ?{...fi,x:Math.max(0,Math.min(PW-fd.w,ox+dx)),y:Math.max(0,Math.min(PH-fd.h,oy+dy))}:fi)}));
+    }else{
+      const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
+      const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
+      updateRef.current(cl=>({...cl,screen:{...cl.screen,
+        x:Math.max(0,Math.min(PW-sw2,ox+dx)),y:Math.max(0,Math.min(PH-sh2,oy+dy))}}));
+    }
+  },[]);
+
+  const onUp=useCallback((e)=>{
+    if(!dr.current)return;
+    if(!dr.current.moved&&toggleRef.current)toggleRef.current(dr.current.type,dr.current.id);
+    dr.current=null;
+  },[]);
+
+  return{onDown,onMove,onUp,roomRef};
 }
 
 // ── RoomCanvas ─────────────────────────────────────────────────────────────────
@@ -327,7 +326,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
     updateClass(c=>({...c,furniture:(c.furniture||[]).filter(f=>f.id!==id)}));
   },[updateClass]);
 
-  const{onDown}=useDrag(cls,updateClass,roomScale,toggleOrient);
+  const{onDown,onMove,onUp,roomRef}=useDrag(cls,updateClass,toggleOrient);
 
   const scr=cls.screen;
   const scrW=scr.orientation==='H'?SCR_W:SCR_H;
@@ -335,7 +334,10 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
   const furniture=cls.furniture||[];
 
   return(
-    <div style={{width:PW,height:PH,position:'relative',userSelect:'none',
+    <div ref={roomRef}
+      onPointerMove={readOnly?null:onMove}
+      onPointerUp={readOnly?null:onUp}
+      style={{width:PW,height:PH,position:'relative',userSelect:'none',
         border:'2.5px solid #8b6c42',borderRadius:6,overflow:'hidden',
         backgroundColor:'#c8955a',
         backgroundImage:[
@@ -363,7 +365,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
         const isDesk=f.type==='teacherDesk';
         return(
           <div key={f.id}
-            onMouseDown={readOnly?null:(e)=>onDown(e,'furniture',f.id)}
+            onPointerDown={readOnly?null:(e)=>onDown(e,'furniture',f.id)}
             onMouseEnter={()=>setHovFurn(f.id)}
             onMouseLeave={()=>setHovFurn(null)}
             title={`${fd.label} — drag to move`}
@@ -396,7 +398,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
       })}
 
       {/* Screen */}
-      <div onMouseDown={readOnly?null:(e)=>onDown(e,'screen')}
+      <div onPointerDown={readOnly?null:(e)=>onDown(e,'screen')}
         title="Click to rotate · Drag to move"
         style={{position:'absolute',left:scr.x,top:scr.y,width:scrW,height:scrH,
           background:'linear-gradient(160deg,#1e293b 0%,#0f172a 100%)',
@@ -443,7 +445,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
         };
 
         return(
-          <div key={t.id} onMouseDown={readOnly?null:(e)=>onDown(e,'table',t.id)}
+          <div key={t.id} onPointerDown={readOnly?null:(e)=>onDown(e,'table',t.id)}
             title="Click to rotate · Drag to move"
             style={{position:'absolute',left:t.x,top:t.y,width:W,height:H,
               borderRadius:5,overflow:'hidden',cursor:readOnly?'default':'pointer',zIndex:10,
