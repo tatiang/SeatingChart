@@ -240,14 +240,16 @@ function chairPositions(x,y,w,h,n){
 }
 
 // ── Drag + click ───────────────────────────────────────────────────────────────
-// Best-practice approach: direct DOM manipulation during drag, commit on drop.
-// This avoids 60+ React re-renders/sec and gives smooth, jank-free movement.
+// rAF-throttled React state updates during drag: chairs/seats move with tables,
+// no snap-back on re-render, smooth 60fps. Pointer capture on room div for
+// reliable event delivery; onLostPointerCapture as safety net.
 function useDrag(cls,updateClass,toggleOrient){
   const dr=useRef(null);
   const roomRef=useRef(null);
   const clsRef=useRef(cls);
   const updateRef=useRef(updateClass);
   const toggleRef=useRef(toggleOrient);
+  const rafId=useRef(0);
   useEffect(()=>{clsRef.current=cls;},[cls]);
   useEffect(()=>{updateRef.current=updateClass;},[updateClass]);
   useEffect(()=>{toggleRef.current=toggleOrient;},[toggleOrient]);
@@ -257,31 +259,54 @@ function useDrag(cls,updateClass,toggleOrient){
     return roomRef.current.getBoundingClientRect().width/PW;
   };
 
+  // Commit a position to React state
+  const commitPos=useCallback((type,id,x,y)=>{
+    const fx=Math.round(x),fy=Math.round(y);
+    if(type==='table')
+      updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id?{...t,x:fx,y:fy}:t)}));
+    else if(type==='furniture')
+      updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id?{...fi,x:fx,y:fy}:fi)}));
+    else
+      updateRef.current(cl=>({...cl,screen:{...cl.screen,x:fx,y:fy}}));
+  },[]);
+
+  // Finish drag: cancel pending rAF, commit final pos, clear state
+  const endDrag=useCallback((didMove)=>{
+    if(!dr.current)return;
+    if(rafId.current){cancelAnimationFrame(rafId.current);rafId.current=0;}
+    const{type,id,moved,nx,ny}=dr.current;
+    const wasMoved=didMove!=null?didMove:moved;
+    if(!wasMoved){
+      if(toggleRef.current)toggleRef.current(type,id);
+    }else if(nx!=null){
+      commitPos(type,id,nx,ny);
+    }
+    dr.current=null;
+  },[commitPos]);
+
   const onDown=useCallback((e,type,id)=>{
     e.preventDefault();
     e.stopPropagation();
+    if(dr.current)endDrag(dr.current.moved);   // clean up any stuck drag
     const c=clsRef.current;
     let ox=0,oy=0;
     if(type==='table'){const t=c.tables.find(t=>t.id===id);if(!t)return;ox=t.x;oy=t.y;}
     else if(type==='furniture'){const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;ox=f.x;oy=f.y;}
     else{ox=c.screen.x;oy=c.screen.y;}
-    const el=e.currentTarget;               // DOM element we'll move directly
     dr.current={type,id,moved:false,sx:e.clientX,sy:e.clientY,ox,oy,
-                scale:getScale(),el,finalX:ox,finalY:oy,pointerId:e.pointerId};
-    // Capture on room div so move/up keep firing even if pointer leaves room bounds
+                scale:getScale(),nx:null,ny:null};
     if(roomRef.current&&e.pointerId!=null){
       try{roomRef.current.setPointerCapture(e.pointerId);}catch(_){}
     }
-  },[]);
+  },[endDrag]);
 
   const onMove=useCallback((e)=>{
     if(!dr.current)return;
-    const{type,id,sx,sy,ox,oy,scale,el}=dr.current;
+    const{type,id,sx,sy,ox,oy,scale}=dr.current;
     // Dead-zone in SCREEN pixels (consistent regardless of room zoom level)
     const rawDx=e.clientX-sx, rawDy=e.clientY-sy;
     if(!dr.current.moved&&Math.hypot(rawDx,rawDy)<5)return;
     dr.current.moved=true;
-    if(el)el.style.cursor='grabbing';
     const dx=rawDx/scale, dy=rawDy/scale;
     const c=clsRef.current;
     const size=c.tableSize||'sm';
@@ -301,37 +326,33 @@ function useDrag(cls,updateClass,toggleOrient){
       nx=Math.max(0,Math.min(PW-sw2,ox+dx));
       ny=Math.max(0,Math.min(PH-sh2,oy+dy));
     }
-    // Direct DOM update — zero React overhead, silky smooth
-    if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
-    dr.current.finalX=nx;dr.current.finalY=ny;
-  },[]);
+    dr.current.nx=nx;dr.current.ny=ny;
+    // Throttle React state updates to one per animation frame (smooth 60fps)
+    if(!rafId.current){
+      rafId.current=requestAnimationFrame(()=>{
+        rafId.current=0;
+        if(!dr.current||dr.current.nx==null)return;
+        commitPos(dr.current.type,dr.current.id,dr.current.nx,dr.current.ny);
+      });
+    }
+  },[commitPos]);
 
   const onUp=useCallback((e)=>{
     if(!dr.current)return;
-    const{type,id,moved,finalX,finalY,el}=dr.current;
-    if(el)el.style.cursor='';
-    // Release pointer capture
     if(roomRef.current&&e.pointerId!=null){
       try{roomRef.current.releasePointerCapture(e.pointerId);}catch(_){}
     }
-    if(!moved){
-      // No movement — treat as a click (toggle orientation)
-      if(toggleRef.current)toggleRef.current(type,id);
-    }else{
-      // Commit final position to React state (single update, not per-pixel)
-      const fx=Math.round(finalX),fy=Math.round(finalY);
-      if(type==='table'){
-        updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id?{...t,x:fx,y:fy}:t)}));
-      }else if(type==='furniture'){
-        updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id?{...fi,x:fx,y:fy}:fi)}));
-      }else{
-        updateRef.current(cl=>({...cl,screen:{...cl.screen,x:fx,y:fy}}));
-      }
-    }
-    dr.current=null;
-  },[]);
+    endDrag();
+  },[endDrag]);
 
-  return{onDown,onMove,onUp,roomRef};
+  // Safety net: if browser revokes pointer capture (e.g. touch cancelled,
+  // window blur, context menu), commit whatever we have and stop.
+  const onLostCapture=useCallback(()=>{
+    if(dr.current&&dr.current.moved)endDrag();
+    else if(dr.current)dr.current=null;
+  },[endDrag]);
+
+  return{onDown,onMove,onUp,onLostCapture,roomRef};
 }
 
 // ── RoomCanvas ─────────────────────────────────────────────────────────────────
@@ -357,7 +378,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
     updateClass(c=>({...c,furniture:(c.furniture||[]).filter(f=>f.id!==id)}));
   },[updateClass]);
 
-  const{onDown,onMove,onUp,roomRef}=useDrag(cls,updateClass,toggleOrient);
+  const{onDown,onMove,onUp,onLostCapture,roomRef}=useDrag(cls,updateClass,toggleOrient);
 
   const scr=cls.screen;
   const scrW=scr.orientation==='H'?SCR_W:SCR_H;
@@ -368,6 +389,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
     <div ref={roomRef}
       onPointerMove={readOnly?null:onMove}
       onPointerUp={readOnly?null:onUp}
+      onLostPointerCapture={readOnly?null:onLostCapture}
       style={{width:PW,height:PH,position:'relative',userSelect:'none',
         touchAction:'none',
         border:'2.5px solid #8b6c42',borderRadius:6,overflow:'hidden',
