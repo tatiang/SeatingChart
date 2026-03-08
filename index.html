@@ -240,9 +240,9 @@ function chairPositions(x,y,w,h,n){
 }
 
 // ── Drag + click ───────────────────────────────────────────────────────────────
-// rAF-throttled React state updates during drag: chairs/seats move with tables,
-// no snap-back on re-render, smooth 60fps. Pointer capture on room div for
-// reliable event delivery; onLostPointerCapture as safety net.
+// Document-level listeners (most reliable, no pointer-capture quirks).
+// Instant DOM manipulation for the dragged element + rAF-throttled React state
+// updates so chairs/seats follow tables in real time with no snap-back.
 function useDrag(cls,updateClass,toggleOrient){
   const dr=useRef(null);
   const roomRef=useRef(null);
@@ -259,100 +259,102 @@ function useDrag(cls,updateClass,toggleOrient){
     return roomRef.current.getBoundingClientRect().width/PW;
   };
 
-  // Commit a position to React state
-  const commitPos=useCallback((type,id,x,y)=>{
-    const fx=Math.round(x),fy=Math.round(y);
-    if(type==='table')
-      updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id?{...t,x:fx,y:fy}:t)}));
-    else if(type==='furniture')
-      updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id?{...fi,x:fx,y:fy}:fi)}));
-    else
-      updateRef.current(cl=>({...cl,screen:{...cl.screen,x:fx,y:fy}}));
-  },[]);
+  // Handlers stored in a ref so add/removeEventListener always use the same references.
+  // Created once; they only access other refs, so they always read fresh values.
+  const H=useRef(null);
+  if(!H.current){
+    const commit=()=>{
+      if(!dr.current||dr.current.nx==null)return;
+      const{type,id,nx,ny}=dr.current;
+      const fx=Math.round(nx),fy=Math.round(ny);
+      if(type==='table')
+        updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id?{...t,x:fx,y:fy}:t)}));
+      else if(type==='furniture')
+        updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id?{...fi,x:fx,y:fy}:fi)}));
+      else
+        updateRef.current(cl=>({...cl,screen:{...cl.screen,x:fx,y:fy}}));
+    };
+    const detach=()=>{
+      document.removeEventListener('pointermove',H.current.move);
+      document.removeEventListener('pointerup',H.current.up);
+      document.removeEventListener('pointercancel',H.current.up);
+      if(rafId.current){cancelAnimationFrame(rafId.current);rafId.current=0;}
+    };
+    H.current={
+      move:(e)=>{
+        if(!dr.current)return;
+        const{type,id,sx,sy,ox,oy,scale,el}=dr.current;
+        const rawDx=e.clientX-sx,rawDy=e.clientY-sy;
+        if(!dr.current.moved&&Math.hypot(rawDx,rawDy)<5)return;
+        dr.current.moved=true;
+        const dx=rawDx/scale,dy=rawDy/scale;
+        const c=clsRef.current, size=c.tableSize||'sm';
+        let nx,ny;
+        if(type==='table'){
+          const t=c.tables.find(t=>t.id===id);if(!t)return;
+          nx=Math.max(0,Math.min(PW-tw(t.orientation,size),ox+dx));
+          ny=Math.max(0,Math.min(PH-th(t.orientation,size),oy+dy));
+        }else if(type==='furniture'){
+          const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;
+          const fd=FURN[f.type]||{w:34,h:34};
+          nx=Math.max(0,Math.min(PW-fd.w,ox+dx));
+          ny=Math.max(0,Math.min(PH-fd.h,oy+dy));
+        }else{
+          const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
+          const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
+          nx=Math.max(0,Math.min(PW-sw2,ox+dx));
+          ny=Math.max(0,Math.min(PH-sh2,oy+dy));
+        }
+        // Instant visual feedback — move the element directly in the DOM
+        if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
+        dr.current.nx=nx;dr.current.ny=ny;
+        // rAF-throttled React state update (moves chairs/seats with tables)
+        if(!rafId.current){
+          rafId.current=requestAnimationFrame(()=>{
+            rafId.current=0;
+            commit();
+          });
+        }
+      },
+      up:(e)=>{
+        if(!dr.current)return;
+        detach();
+        const{moved,el}=dr.current;
+        if(el)el.style.cursor='';
+        if(!moved){
+          if(toggleRef.current)toggleRef.current(dr.current.type,dr.current.id);
+        }else{
+          commit();
+        }
+        dr.current=null;
+      },
+      commit,detach
+    };
+  }
 
-  // Finish drag: cancel pending rAF, commit final pos, clear state
-  const endDrag=useCallback((didMove)=>{
-    if(!dr.current)return;
-    if(rafId.current){cancelAnimationFrame(rafId.current);rafId.current=0;}
-    const{type,id,moved,nx,ny}=dr.current;
-    const wasMoved=didMove!=null?didMove:moved;
-    if(!wasMoved){
-      if(toggleRef.current)toggleRef.current(type,id);
-    }else if(nx!=null){
-      commitPos(type,id,nx,ny);
-    }
-    dr.current=null;
-  },[commitPos]);
+  // Cleanup on unmount
+  useEffect(()=>()=>{H.current.detach();dr.current=null;},[]);
 
   const onDown=useCallback((e,type,id)=>{
     e.preventDefault();
     e.stopPropagation();
-    if(dr.current)endDrag(dr.current.moved);   // clean up any stuck drag
+    // Clean up any stuck drag
+    if(dr.current){H.current.detach();if(dr.current.moved)H.current.commit();dr.current=null;}
     const c=clsRef.current;
     let ox=0,oy=0;
     if(type==='table'){const t=c.tables.find(t=>t.id===id);if(!t)return;ox=t.x;oy=t.y;}
     else if(type==='furniture'){const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;ox=f.x;oy=f.y;}
     else{ox=c.screen.x;oy=c.screen.y;}
+    const el=e.currentTarget;
     dr.current={type,id,moved:false,sx:e.clientX,sy:e.clientY,ox,oy,
-                scale:getScale(),nx:null,ny:null};
-    if(roomRef.current&&e.pointerId!=null){
-      try{roomRef.current.setPointerCapture(e.pointerId);}catch(_){}
-    }
-  },[endDrag]);
+                scale:getScale(),el,nx:null,ny:null};
+    // Attach document-level listeners — always fire regardless of pointer location
+    document.addEventListener('pointermove',H.current.move);
+    document.addEventListener('pointerup',H.current.up);
+    document.addEventListener('pointercancel',H.current.up);
+  },[]);
 
-  const onMove=useCallback((e)=>{
-    if(!dr.current)return;
-    const{type,id,sx,sy,ox,oy,scale}=dr.current;
-    // Dead-zone in SCREEN pixels (consistent regardless of room zoom level)
-    const rawDx=e.clientX-sx, rawDy=e.clientY-sy;
-    if(!dr.current.moved&&Math.hypot(rawDx,rawDy)<5)return;
-    dr.current.moved=true;
-    const dx=rawDx/scale, dy=rawDy/scale;
-    const c=clsRef.current;
-    const size=c.tableSize||'sm';
-    let nx,ny;
-    if(type==='table'){
-      const t=c.tables.find(t=>t.id===id);if(!t)return;
-      nx=Math.max(0,Math.min(PW-tw(t.orientation,size),ox+dx));
-      ny=Math.max(0,Math.min(PH-th(t.orientation,size),oy+dy));
-    }else if(type==='furniture'){
-      const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;
-      const fd=FURN[f.type]||{w:34,h:34};
-      nx=Math.max(0,Math.min(PW-fd.w,ox+dx));
-      ny=Math.max(0,Math.min(PH-fd.h,oy+dy));
-    }else{
-      const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
-      const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
-      nx=Math.max(0,Math.min(PW-sw2,ox+dx));
-      ny=Math.max(0,Math.min(PH-sh2,oy+dy));
-    }
-    dr.current.nx=nx;dr.current.ny=ny;
-    // Throttle React state updates to one per animation frame (smooth 60fps)
-    if(!rafId.current){
-      rafId.current=requestAnimationFrame(()=>{
-        rafId.current=0;
-        if(!dr.current||dr.current.nx==null)return;
-        commitPos(dr.current.type,dr.current.id,dr.current.nx,dr.current.ny);
-      });
-    }
-  },[commitPos]);
-
-  const onUp=useCallback((e)=>{
-    if(!dr.current)return;
-    if(roomRef.current&&e.pointerId!=null){
-      try{roomRef.current.releasePointerCapture(e.pointerId);}catch(_){}
-    }
-    endDrag();
-  },[endDrag]);
-
-  // Safety net: if browser revokes pointer capture (e.g. touch cancelled,
-  // window blur, context menu), commit whatever we have and stop.
-  const onLostCapture=useCallback(()=>{
-    if(dr.current&&dr.current.moved)endDrag();
-    else if(dr.current)dr.current=null;
-  },[endDrag]);
-
-  return{onDown,onMove,onUp,onLostCapture,roomRef};
+  return{onDown,roomRef};
 }
 
 // ── RoomCanvas ─────────────────────────────────────────────────────────────────
@@ -378,7 +380,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
     updateClass(c=>({...c,furniture:(c.furniture||[]).filter(f=>f.id!==id)}));
   },[updateClass]);
 
-  const{onDown,onMove,onUp,onLostCapture,roomRef}=useDrag(cls,updateClass,toggleOrient);
+  const{onDown,roomRef}=useDrag(cls,updateClass,toggleOrient);
 
   const scr=cls.screen;
   const scrW=scr.orientation==='H'?SCR_W:SCR_H;
@@ -387,9 +389,6 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
 
   return(
     <div ref={roomRef}
-      onPointerMove={readOnly?null:onMove}
-      onPointerUp={readOnly?null:onUp}
-      onLostPointerCapture={readOnly?null:onLostCapture}
       style={{width:PW,height:PH,position:'relative',userSelect:'none',
         touchAction:'none',
         border:'2.5px solid #8b6c42',borderRadius:6,overflow:'hidden',
