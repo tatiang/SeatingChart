@@ -240,16 +240,13 @@ function chairPositions(x,y,w,h,n){
 }
 
 // ── Drag + click ───────────────────────────────────────────────────────────────
-// Document-level listeners (most reliable, no pointer-capture quirks).
-// Instant DOM manipulation for the dragged element + rAF-throttled React state
-// updates so chairs/seats follow tables in real time with no snap-back.
+// Direct DOM manipulation during drag, commit on drop.
 function useDrag(cls,updateClass,toggleOrient){
   const dr=useRef(null);
   const roomRef=useRef(null);
   const clsRef=useRef(cls);
   const updateRef=useRef(updateClass);
   const toggleRef=useRef(toggleOrient);
-  const rafId=useRef(0);
   useEffect(()=>{clsRef.current=cls;},[cls]);
   useEffect(()=>{updateRef.current=updateClass;},[updateClass]);
   useEffect(()=>{toggleRef.current=toggleOrient;},[toggleOrient]);
@@ -259,87 +256,9 @@ function useDrag(cls,updateClass,toggleOrient){
     return roomRef.current.getBoundingClientRect().width/PW;
   };
 
-  // Handlers stored in a ref so add/removeEventListener always use the same references.
-  // Created once; they only access other refs, so they always read fresh values.
-  const H=useRef(null);
-  if(!H.current){
-    const commit=()=>{
-      if(!dr.current||dr.current.nx==null)return;
-      const{type,id,nx,ny}=dr.current;
-      const fx=Math.round(nx),fy=Math.round(ny);
-      if(type==='table')
-        updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id?{...t,x:fx,y:fy}:t)}));
-      else if(type==='furniture')
-        updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id?{...fi,x:fx,y:fy}:fi)}));
-      else
-        updateRef.current(cl=>({...cl,screen:{...cl.screen,x:fx,y:fy}}));
-    };
-    const detach=()=>{
-      document.removeEventListener('pointermove',H.current.move);
-      document.removeEventListener('pointerup',H.current.up);
-      document.removeEventListener('pointercancel',H.current.up);
-      if(rafId.current){cancelAnimationFrame(rafId.current);rafId.current=0;}
-    };
-    H.current={
-      move:(e)=>{
-        if(!dr.current)return;
-        const{type,id,sx,sy,ox,oy,scale,el}=dr.current;
-        const rawDx=e.clientX-sx,rawDy=e.clientY-sy;
-        if(!dr.current.moved&&Math.hypot(rawDx,rawDy)<5)return;
-        dr.current.moved=true;
-        const dx=rawDx/scale,dy=rawDy/scale;
-        const c=clsRef.current, size=c.tableSize||'sm';
-        let nx,ny;
-        if(type==='table'){
-          const t=c.tables.find(t=>t.id===id);if(!t)return;
-          nx=Math.max(0,Math.min(PW-tw(t.orientation,size),ox+dx));
-          ny=Math.max(0,Math.min(PH-th(t.orientation,size),oy+dy));
-        }else if(type==='furniture'){
-          const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;
-          const fd=FURN[f.type]||{w:34,h:34};
-          nx=Math.max(0,Math.min(PW-fd.w,ox+dx));
-          ny=Math.max(0,Math.min(PH-fd.h,oy+dy));
-        }else{
-          const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
-          const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
-          nx=Math.max(0,Math.min(PW-sw2,ox+dx));
-          ny=Math.max(0,Math.min(PH-sh2,oy+dy));
-        }
-        // Instant visual feedback — move the element directly in the DOM
-        if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
-        dr.current.nx=nx;dr.current.ny=ny;
-        // rAF-throttled React state update (moves chairs/seats with tables)
-        if(!rafId.current){
-          rafId.current=requestAnimationFrame(()=>{
-            rafId.current=0;
-            commit();
-          });
-        }
-      },
-      up:(e)=>{
-        if(!dr.current)return;
-        detach();
-        const{moved,el}=dr.current;
-        if(el)el.style.cursor='';
-        if(!moved){
-          if(toggleRef.current)toggleRef.current(dr.current.type,dr.current.id);
-        }else{
-          commit();
-        }
-        dr.current=null;
-      },
-      commit,detach
-    };
-  }
-
-  // Cleanup on unmount
-  useEffect(()=>()=>{H.current.detach();dr.current=null;},[]);
-
   const onDown=useCallback((e,type,id)=>{
     e.preventDefault();
     e.stopPropagation();
-    // Clean up any stuck drag
-    if(dr.current){H.current.detach();if(dr.current.moved)H.current.commit();dr.current=null;}
     const c=clsRef.current;
     let ox=0,oy=0;
     if(type==='table'){const t=c.tables.find(t=>t.id===id);if(!t)return;ox=t.x;oy=t.y;}
@@ -347,14 +266,68 @@ function useDrag(cls,updateClass,toggleOrient){
     else{ox=c.screen.x;oy=c.screen.y;}
     const el=e.currentTarget;
     dr.current={type,id,moved:false,sx:e.clientX,sy:e.clientY,ox,oy,
-                scale:getScale(),el,nx:null,ny:null};
-    // Attach document-level listeners — always fire regardless of pointer location
-    document.addEventListener('pointermove',H.current.move);
-    document.addEventListener('pointerup',H.current.up);
-    document.addEventListener('pointercancel',H.current.up);
+                scale:getScale(),el,finalX:ox,finalY:oy};
+    if(roomRef.current&&e.pointerId!=null){
+      try{roomRef.current.setPointerCapture(e.pointerId);}catch(_){}
+    }
   },[]);
 
-  return{onDown,roomRef};
+  const onMove=useCallback((e)=>{
+    if(!dr.current)return;
+    const{type,id,sx,sy,ox,oy,scale,el}=dr.current;
+    // Dead-zone in SCREEN pixels (consistent regardless of room zoom level)
+    const rawDx=e.clientX-sx, rawDy=e.clientY-sy;
+    if(!dr.current.moved&&Math.hypot(rawDx,rawDy)<5)return;
+    dr.current.moved=true;
+    if(el)el.style.cursor='grabbing';
+    const dx=rawDx/scale, dy=rawDy/scale;
+    const c=clsRef.current;
+    const size=c.tableSize||'sm';
+    let nx,ny;
+    if(type==='table'){
+      const t=c.tables.find(t=>t.id===id);if(!t)return;
+      nx=Math.max(0,Math.min(PW-tw(t.orientation,size),ox+dx));
+      ny=Math.max(0,Math.min(PH-th(t.orientation,size),oy+dy));
+    }else if(type==='furniture'){
+      const f=(c.furniture||[]).find(f=>f.id===id);if(!f)return;
+      const fd=FURN[f.type]||{w:34,h:34};
+      nx=Math.max(0,Math.min(PW-fd.w,ox+dx));
+      ny=Math.max(0,Math.min(PH-fd.h,oy+dy));
+    }else{
+      const sw2=c.screen.orientation==='H'?SCR_W:SCR_H;
+      const sh2=c.screen.orientation==='H'?SCR_H:SCR_W;
+      nx=Math.max(0,Math.min(PW-sw2,ox+dx));
+      ny=Math.max(0,Math.min(PH-sh2,oy+dy));
+    }
+    // Direct DOM update — zero React overhead, smooth dragging
+    if(el){el.style.left=nx+'px';el.style.top=ny+'px';}
+    dr.current.finalX=nx;dr.current.finalY=ny;
+  },[]);
+
+  const onUp=useCallback((e)=>{
+    if(!dr.current)return;
+    const{type,id,moved,finalX,finalY,el}=dr.current;
+    if(el)el.style.cursor='';
+    if(roomRef.current&&e.pointerId!=null){
+      try{roomRef.current.releasePointerCapture(e.pointerId);}catch(_){}
+    }
+    if(!moved){
+      if(toggleRef.current)toggleRef.current(type,id);
+    }else{
+      // Commit final position to React state
+      const fx=Math.round(finalX),fy=Math.round(finalY);
+      if(type==='table'){
+        updateRef.current(cl=>({...cl,tables:cl.tables.map(t=>t.id===id?{...t,x:fx,y:fy}:t)}));
+      }else if(type==='furniture'){
+        updateRef.current(cl=>({...cl,furniture:(cl.furniture||[]).map(fi=>fi.id===id?{...fi,x:fx,y:fy}:fi)}));
+      }else{
+        updateRef.current(cl=>({...cl,screen:{...cl.screen,x:fx,y:fy}}));
+      }
+    }
+    dr.current=null;
+  },[]);
+
+  return{onDown,onMove,onUp,roomRef};
 }
 
 // ── RoomCanvas ─────────────────────────────────────────────────────────────────
@@ -380,7 +353,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
     updateClass(c=>({...c,furniture:(c.furniture||[]).filter(f=>f.id!==id)}));
   },[updateClass]);
 
-  const{onDown,roomRef}=useDrag(cls,updateClass,toggleOrient);
+  const{onDown,onMove,onUp,roomRef}=useDrag(cls,updateClass,toggleOrient);
 
   const scr=cls.screen;
   const scrW=scr.orientation==='H'?SCR_W:SCR_H;
@@ -389,6 +362,8 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
 
   return(
     <div ref={roomRef}
+      onPointerMove={readOnly?null:onMove}
+      onPointerUp={readOnly?null:onUp}
       style={{width:PW,height:PH,position:'relative',userSelect:'none',
         touchAction:'none',
         border:'2.5px solid #8b6c42',borderRadius:6,overflow:'hidden',
@@ -788,6 +763,22 @@ function TablesTab({cls,updateClass}){
   const setSeats=(id,s)=>updateClass(c=>({...c,tables:c.tables.map(t=>t.id===id?{...t,seats:+s}:t)}));
   const toggleScr=()=>updateClass(c=>({...c,screen:{...c.screen,orientation:c.screen.orientation==='H'?'V':'H'}}));
 
+  const nudge=(id,dx,dy)=>updateClass(c=>{
+    const sz=c.tableSize||'sm';
+    return{...c,tables:c.tables.map(t=>{
+      if(t.id!==id)return t;
+      const w=tw(t.orientation,sz),h=th(t.orientation,sz);
+      return{...t,x:Math.max(0,Math.min(PW-w,t.x+dx)),y:Math.max(0,Math.min(PH-h,t.y+dy))};
+    })};
+  });
+  const nudgeScr=(dx,dy)=>updateClass(c=>{
+    const sw=c.screen.orientation==='H'?SCR_W:SCR_H;
+    const sh=c.screen.orientation==='H'?SCR_H:SCR_W;
+    return{...c,screen:{...c.screen,
+      x:Math.max(0,Math.min(PW-sw,c.screen.x+dx)),
+      y:Math.max(0,Math.min(PH-sh,c.screen.y+dy))}};
+  });
+
   const addFurniture=type=>updateClass(c=>({...c,
     furniture:[...(c.furniture||[]),{id:uid(),type,x:PW/2-FURN[type].w/2,y:PH/2-FURN[type].h/2}]}));
 
@@ -838,24 +829,38 @@ function TablesTab({cls,updateClass}){
         <div style={{display:'flex',flexDirection:'column',gap:5}}>
           {!cls.tables.length&&<div style={{fontSize:12,color:'#94a3b8',textAlign:'center',padding:8}}>No tables</div>}
           {cls.tables.map((t,i)=>(
-            <div key={t.id} style={{display:'flex',alignItems:'center',gap:5,
-              padding:'6px 10px',background:'#fff',borderRadius:8,
+            <div key={t.id} style={{background:'#fff',borderRadius:8,
               border:`1.5px solid ${TCOLORS[i%TCOLORS.length]}33`,
-              boxShadow:`inset 3px 0 0 ${TCOLORS[i%TCOLORS.length]}`}}>
-              <input value={t.label} onChange={e=>rename(t.id,e.target.value)}
-                style={{flex:1,border:'none',background:'transparent',fontSize:13,
-                  fontWeight:600,color:'#1e293b',outline:'none',minWidth:0}}/>
-              <button onClick={()=>toggleO(t.id)}
-                style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:5,
-                  cursor:'pointer',fontSize:11,padding:'3px 7px',color:'#475569',fontWeight:600,flexShrink:0}}>
-                {t.orientation==='V'?'↕':'↔'}
-              </button>
-              <select value={t.seats||4} onChange={e=>setSeats(t.id,e.target.value)}
-                title="Chair count"
-                style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:5,
-                  cursor:'pointer',fontSize:11,padding:'3px 5px',color:'#475569',fontWeight:600}}>
-                {[2,3,4,5,6,7,8].map(n=><option key={n} value={n}>{n}🪑</option>)}
-              </select>
+              boxShadow:`inset 3px 0 0 ${TCOLORS[i%TCOLORS.length]}`,overflow:'hidden'}}>
+              <div style={{display:'flex',alignItems:'center',gap:5,padding:'6px 10px'}}>
+                <input value={t.label} onChange={e=>rename(t.id,e.target.value)}
+                  style={{flex:1,border:'none',background:'transparent',fontSize:13,
+                    fontWeight:600,color:'#1e293b',outline:'none',minWidth:0}}/>
+                <button onClick={()=>toggleO(t.id)}
+                  style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:5,
+                    cursor:'pointer',fontSize:11,padding:'3px 7px',color:'#475569',fontWeight:600,flexShrink:0}}>
+                  {t.orientation==='V'?'↕':'↔'}
+                </button>
+                <select value={t.seats||4} onChange={e=>setSeats(t.id,e.target.value)}
+                  title="Chair count"
+                  style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:5,
+                    cursor:'pointer',fontSize:11,padding:'3px 5px',color:'#475569',fontWeight:600}}>
+                  {[2,3,4,5,6,7,8].map(n=><option key={n} value={n}>{n}🪑</option>)}
+                </select>
+              </div>
+              {/* Nudge controls */}
+              <div style={{display:'flex',alignItems:'center',gap:4,padding:'3px 10px 6px',borderTop:'1px solid #f1f5f9'}}>
+                <span style={{fontSize:9,color:'#94a3b8',fontWeight:600,marginRight:2}}>Move</span>
+                {[['-20','◀◀',(-40),0],['-5','◀',(-10),0],['','▲',0,(-10)],['','▼',0,10],['+5','▶',10,0],['+20','▶▶',40,0]].map(([,lbl,dx,dy],j)=>(
+                  <button key={j} onClick={()=>nudge(t.id,dx,dy)}
+                    title={`Nudge ${Math.abs(dx||dy)}px ${dx<0?'left':dx>0?'right':dy<0?'up':'down'}`}
+                    style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:4,
+                      cursor:'pointer',fontSize:9,padding:'2px 4px',color:'#64748b',fontWeight:600,
+                      lineHeight:1,minWidth:0}}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -863,14 +868,27 @@ function TablesTab({cls,updateClass}){
 
       <div>
         <div className="section-lbl">Screen</div>
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
-          background:'#f8fafc',borderRadius:8,border:'1.5px solid #e2e8f0'}}>
-          <span style={{fontSize:13,flex:1,fontWeight:600,color:'#334155'}}>▶ Projection Screen</span>
-          <button onClick={toggleScr}
-            style={{border:'1px solid #e2e8f0',background:'#fff',borderRadius:6,
-              cursor:'pointer',fontSize:11.5,padding:'3px 10px',color:'#475569',fontWeight:600}}>
-            {cls.screen.orientation==='H'?'↔ H':'↕ V'}
-          </button>
+        <div style={{background:'#f8fafc',borderRadius:8,border:'1.5px solid #e2e8f0',overflow:'hidden'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px'}}>
+            <span style={{fontSize:13,flex:1,fontWeight:600,color:'#334155'}}>▶ Projection Screen</span>
+            <button onClick={toggleScr}
+              style={{border:'1px solid #e2e8f0',background:'#fff',borderRadius:6,
+                cursor:'pointer',fontSize:11.5,padding:'3px 10px',color:'#475569',fontWeight:600}}>
+              {cls.screen.orientation==='H'?'↔ H':'↕ V'}
+            </button>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:4,padding:'3px 10px 6px',borderTop:'1px solid #e9ecef'}}>
+            <span style={{fontSize:9,color:'#94a3b8',fontWeight:600,marginRight:2}}>Move</span>
+            {[['-20','◀◀',(-40),0],['-5','◀',(-10),0],['','▲',0,(-10)],['','▼',0,10],['+5','▶',10,0],['+20','▶▶',40,0]].map(([,lbl,dx,dy],j)=>(
+              <button key={j} onClick={()=>nudgeScr(dx,dy)}
+                title={`Nudge ${Math.abs(dx||dy)}px ${dx<0?'left':dx>0?'right':dy<0?'up':'down'}`}
+                style={{border:'1px solid #e2e8f0',background:'#fff',borderRadius:4,
+                  cursor:'pointer',fontSize:9,padding:'2px 4px',color:'#64748b',fontWeight:600,
+                  lineHeight:1,minWidth:0}}>
+                {lbl}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
