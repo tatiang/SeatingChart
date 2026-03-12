@@ -1136,7 +1136,7 @@ async function fetchAllRosters(token){
   console.log('[Roster] All sheet tabs:', allTabNames);
   for(const sheet of(meta.sheets||[])){
     const title=sheet.properties.title;
-    const grade=GRADE_MAP[title.toLowerCase()];
+    const grade=GRADE_MAP[title.trim().toLowerCase()];
     if(!grade){console.log('[Roster] Skipped tab (no GRADE_MAP match):', JSON.stringify(title));continue;}
     const valRes=await fetch(`${BASE}/${ROSTER_SHEET_ID}/values/${encodeURIComponent(title)}`,{headers:h});
     if(!valRes.ok)continue;
@@ -1162,7 +1162,7 @@ async function fetchAllRosters(token){
         if(!cell||/^bold\s*=/i.test(cell))continue;
         students.push(cell);
       }
-      if(students.length>0)classes.push({code,teacher:teacherName,grade:title,students});
+      if(students.length>0)classes.push({code,teacher:teacherName,grade:title.trim(),students});
     }
   }
   return {classes, allTabNames};
