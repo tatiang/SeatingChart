@@ -168,16 +168,23 @@ function generateAssignment(cls){
     ordered=[...shuffle(active.filter(s=>s.gender==='M')),
              ...shuffle(active.filter(s=>s.gender==='F')),
              ...shuffle(active.filter(s=>s.gender!=='M'&&s.gender!=='F'))];
-  }else if(genderMode==='alternating'){
-    const M=shuffle(active.filter(s=>s.gender==='M'));
-    const F=shuffle(active.filter(s=>s.gender==='F'));
-    const X=shuffle(active.filter(s=>s.gender!=='M'&&s.gender!=='F'));
-    const r=[];let mi=0,fi=0;
-    while(mi<M.length||fi<F.length){if(mi<M.length)r.push(M[mi++]);if(fi<F.length)r.push(F[fi++]);}
-    ordered=[...r,...X];
   }else{ordered=shuffle(active);}
   const asgn={};tables.forEach(t=>{asgn[t.id]=[];});
   ordered.forEach((s,i)=>asgn[tables[i%tables.length].id].push(s.id));
+  // Alternating: reorder within each table so seats go M-F-M-F (or F-M-F-M)
+  if(genderMode==='alternating'){
+    for(const tid of Object.keys(asgn)){
+      const ts=asgn[tid].map(id=>active.find(s=>s.id===id));
+      const M=shuffle(ts.filter(s=>s.gender==='M'));
+      const F=shuffle(ts.filter(s=>s.gender==='F'));
+      const X=ts.filter(s=>s.gender!=='M'&&s.gender!=='F');
+      const r=[];let mi=0,fi=0;
+      if(M.length>=F.length){while(mi<M.length||fi<F.length){if(mi<M.length)r.push(M[mi++]);if(fi<F.length)r.push(F[fi++]);}}
+      else{while(fi<F.length||mi<M.length){if(fi<F.length)r.push(F[fi++]);if(mi<M.length)r.push(M[mi++]);}}
+      r.push(...X);
+      asgn[tid]=r.map(s=>s.id);
+    }
+  }
   for(let it=0;it<80;it++){
     let ok=true;
     for(const[a,b]of keepApart){
@@ -337,6 +344,17 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
   const size=cls.tableSize||'sm';
   const getS=id=>cls.students.find(s=>s.id===id);
   const [hovFurn,setHovFurn]=useState(null);
+  const [chipMenu,setChipMenu]=useState(null); // {sid,fromTid,x,y}
+
+  const moveStudent=useCallback((sid,fromTid,toTid)=>{
+    if(fromTid===toTid)return;
+    updateClass(c=>{
+      const a={...(c.currentAssignment||{})};
+      if(a[fromTid])a[fromTid]=a[fromTid].filter(id=>id!==sid);
+      a[toTid]=[...(a[toTid]||[]),sid];
+      return{...c,currentAssignment:a};
+    });
+  },[updateClass]);
 
   const nameFontSize=size==='sm'?9:size==='md'?10.5:12.5;
   const lblFontSize=size==='sm'?8.5:size==='md'?9.5:11;
@@ -360,7 +378,8 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
   const scrH=scr.orientation==='H'?SCR_H:SCR_W;
   const furniture=cls.furniture||[];
 
-  return(
+  return(<>
+    {chipMenu&&<div style={{position:'fixed',inset:0,zIndex:9998}} onClick={()=>setChipMenu(null)}/>}
     <div ref={roomRef}
       onPointerMove={readOnly?null:onMove}
       onPointerUp={readOnly?null:onUp}
@@ -495,22 +514,64 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
               width:isV?W:W-HBAR,height:isV?H-HBAR:H,
               background:'rgba(255,255,255,.92)',
               display:'flex',flexWrap:'wrap',alignContent:'flex-start',gap:2,padding:3,overflow:'hidden'}}>
-              {studs.map(s=>(
-                <div key={s.id} style={{display:'flex',alignItems:'center',gap:2,
-                  background:'#fff',borderRadius:3,
-                  borderLeft:`2.5px solid ${GCOLOR[s.gender]||GCOLOR['']}`,
+              {studs.map(s=>{
+                const isSelected=chipMenu?.sid===s.id;
+                return(
+                <div key={s.id}
+                  onPointerDown={e=>e.stopPropagation()}
+                  onClick={readOnly||!assignment?undefined:e=>{
+                    e.stopPropagation();
+                    if(chipMenu?.sid===s.id){setChipMenu(null);}
+                    else{setChipMenu({sid:s.id,fromTid:t.id,x:e.clientX,y:e.clientY});}
+                  }}
+                  style={{display:'flex',alignItems:'center',gap:2,
+                  background:isSelected?'#dbeafe':'#fff',borderRadius:3,
+                  borderLeft:`2.5px solid ${isSelected?'#2563eb':(GCOLOR[s.gender]||GCOLOR[''])}`,
                   padding:'1px 3px 1px 2px',fontSize:nameFontSize,lineHeight:1.25,color:'#1e293b',
-                  maxWidth:'100%',flexShrink:0,boxShadow:'0 1px 2px rgba(0,0,0,.07)',overflow:'hidden'}}>
+                  maxWidth:'100%',flexShrink:0,boxShadow:'0 1px 2px rgba(0,0,0,.07)',overflow:'hidden',
+                  cursor:readOnly||!assignment?'default':'pointer'}}>
                   {s.photoURL&&<img src={s.photoURL} alt="" style={{width:nameFontSize+2,height:nameFontSize+2,borderRadius:'50%',objectFit:'cover',flexShrink:0}} onError={e=>e.target.style.display='none'}/>}
                   <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{dispName(s)}</span>
                 </div>
-              ))}
-              {!ids.length&&<span style={{color:'#d1c8b8',fontSize:nameFontSize-1,fontStyle:'italic'}}>empty</span>}
+                );
+              })}
+                      {!ids.length&&<span style={{color:'#d1c8b8',fontSize:nameFontSize-1,fontStyle:'italic'}}>empty</span>}
             </div>
           </div>
         );
       })}
     </div>
+    {chipMenu&&(()=>{
+      const movStu=cls.students.find(s=>s.id===chipMenu.sid);
+      return(
+        <div style={{position:'fixed',left:chipMenu.x,top:chipMenu.y,zIndex:9999,
+          background:'#fff',border:'1.5px solid #cbd5e1',borderRadius:8,
+          boxShadow:'0 8px 24px rgba(0,0,0,.18)',padding:'8px 10px',minWidth:160}}
+          onPointerDown={e=>e.stopPropagation()}>
+          <div style={{fontSize:10,fontWeight:700,color:'#64748b',marginBottom:5,
+            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            Move {movStu?.name?.split(' ')[0]||'student'} to:
+          </div>
+          {cls.tables.filter(t=>t.id!==chipMenu.fromTid).map(t=>(
+            <button key={t.id} onClick={()=>{moveStudent(chipMenu.sid,chipMenu.fromTid,t.id);setChipMenu(null);}}
+              style={{display:'block',width:'100%',textAlign:'left',border:'1px solid #e2e8f0',
+                borderRadius:5,padding:'4px 8px',marginBottom:3,fontSize:11,cursor:'pointer',
+                background:'#f8fafc',color:'#0f172a',fontWeight:500}}
+              onMouseEnter={e=>e.target.style.background='#eff6ff'}
+              onMouseLeave={e=>e.target.style.background='#f8fafc'}>
+              {t.label}
+            </button>
+          ))}
+          <button onClick={()=>setChipMenu(null)}
+            style={{display:'block',width:'100%',textAlign:'center',border:'none',
+              borderRadius:5,padding:'3px 8px',marginTop:2,fontSize:10,cursor:'pointer',
+              background:'none',color:'#94a3b8'}}>
+            Cancel
+          </button>
+        </div>
+      );
+    })()}
+  </>
   );
 }
 
