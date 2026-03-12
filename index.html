@@ -1132,12 +1132,10 @@ async function fetchAllRosters(token){
   if(!metaRes.ok)throw new Error(`Sheets API error ${metaRes.status} — try signing in again`);
   const meta=await metaRes.json();
   const classes=[];
-  const allTabNames=(meta.sheets||[]).map(s=>s.properties.title);
-  console.log('[Roster] All sheet tabs:', allTabNames);
   for(const sheet of(meta.sheets||[])){
     const title=sheet.properties.title;
     const grade=GRADE_MAP[title.trim().toLowerCase()];
-    if(!grade){console.log('[Roster] Skipped tab (no GRADE_MAP match):', JSON.stringify(title));continue;}
+    if(!grade)continue;
     const valRes=await fetch(`${BASE}/${ROSTER_SHEET_ID}/values/${encodeURIComponent(title)}`,{headers:h});
     if(!valRes.ok)continue;
     const{values:rows=[]}=await valRes.json();
@@ -1165,7 +1163,7 @@ async function fetchAllRosters(token){
       if(students.length>0)classes.push({code,teacher:teacherName,grade:title.trim(),students});
     }
   }
-  return {classes, allTabNames};
+  return classes;
 }
 
 const ROSTER_CACHE='rosterCache_v1';
@@ -1176,17 +1174,15 @@ function RosterPanel({fbUser,createClassFromRoster}){
   const[loading,setLoading]=useState(false);
   const[error,setError]=useState('');
   const[imported,setImported]=useState({});
-  const[allTabs,setAllTabs]=useState(()=>{try{const c=JSON.parse(localStorage.getItem(ROSTER_CACHE)||'null');return c?.allTabNames||null;}catch{return null;}});
   const tokenRef=useRef(null);
 
   const loadRosters=async()=>{
     setLoading(true);setError('');
     try{
       if(!tokenRef.current)tokenRef.current=await getSheetsToken(fbUser?.email);
-      const {classes,allTabNames}=await fetchAllRosters(tokenRef.current);
-      setRosters(classes);
-      setAllTabs(allTabNames);
-      localStorage.setItem(ROSTER_CACHE,JSON.stringify({data:classes,allTabNames,ts:Date.now()}));
+      const data=await fetchAllRosters(tokenRef.current);
+      setRosters(data);
+      localStorage.setItem(ROSTER_CACHE,JSON.stringify({data,ts:Date.now()}));
     }catch(e){
       setError(e.message||'Failed to load. Please try again.');
       tokenRef.current=null;
@@ -1255,16 +1251,6 @@ function RosterPanel({fbUser,createClassFromRoster}){
       ))}
       {rosters&&<div style={{fontSize:10,color:'#94a3b8',textAlign:'center',marginTop:6}}>
         {rosters.length} classes · K–4 Class Lists 2025–2026
-      </div>}
-      {allTabs&&<div style={{fontSize:9.5,color:'#94a3b8',marginTop:8,padding:'6px 8px',
-        background:'#f1f5f9',borderRadius:5,lineHeight:1.6}}>
-        <strong style={{color:'#64748b'}}>Sheet tabs found:</strong>{' '}
-        {allTabs.map((t,i)=>{
-          const matched=!!GRADE_MAP[t.toLowerCase()];
-          return <span key={i} style={{marginRight:6,color:matched?'#16a34a':'#dc2626',fontWeight:matched?600:400}}>
-            {t}{!matched?' ✗':' ✓'}
-          </span>;
-        })}
       </div>}
     </div>
   );
