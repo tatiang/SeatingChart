@@ -119,7 +119,7 @@ const GCOLOR ={M:'#3b82f6',F:'#ec4899',NB:'#8b5cf6','':'#94a3b8',X:'#8b5cf6'};
 
 const STORAGE='seatplan-v8';
 const ROSTER_SHEET_ID='1uvuCvkcqCLXokBlRlHJTtqE6S2UpMP-mKQbuyTBaws4';
-const GRADE_MAP={'kindergarten':'K','first grade':'1','second grade':'2','third grade':'3','fourth grade':'4','fifth grade':'5','sixth grade':'6'};
+const GRADE_MAP={'kindergarten':'K','kinder':'K','k':'K','first grade':'1','1st grade':'1','1st':'1','second grade':'2','2nd grade':'2','2nd':'2','third grade':'3','3rd grade':'3','3rd':'3','fourth grade':'4','4th grade':'4','4th':'4','fifth grade':'5','5th grade':'5','5th':'5','sixth grade':'6','6th grade':'6','6th':'6'};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const shuffle=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
 const fmt=d=>new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
