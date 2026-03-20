@@ -32,36 +32,37 @@ if (window.FB_READY) {
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#ede8df;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;}
 input,select,textarea,button{font-family:inherit;}
-::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:#b0a090;border-radius:10px;}
+::-webkit-scrollbar-thumb{background:rgba(99,102,241,.25);border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(99,102,241,.45);}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 15px;
-  border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;
+  border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;
   transition:all .14s;white-space:nowrap;line-height:1;}
 .btn:active{transform:scale(.96);}
-.btn-primary{background:#2563eb;color:#fff;box-shadow:0 1px 4px rgba(37,99,235,.35);}
-.btn-primary:hover{background:#1d4ed8;}
-.btn-primary:disabled{background:#93c5fd;cursor:default;transform:none;box-shadow:none;}
+.btn-primary{background:#4f46e5;color:#fff;box-shadow:0 1px 4px rgba(79,70,229,.35);}
+.btn-primary:hover{background:#4338ca;}
+.btn-primary:disabled{background:#a5b4fc;cursor:default;transform:none;box-shadow:none;}
 .btn-success{background:#16a34a;color:#fff;}
 .btn-success:hover{background:#15803d;}
-.btn-ghost{background:#fff;color:#475569;border:1px solid #e2e8f0;}
-.btn-ghost:hover{background:#f1f5f9;}
+.btn-ghost{background:#fff;color:#475569;border:1px solid #e2e8f0;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+.btn-ghost:hover{background:#f8fafc;border-color:#cbd5e1;}
 .btn-ghost:disabled{opacity:.4;cursor:default;transform:none;}
 .btn-red{background:#fee2e2;color:#dc2626;border:1px solid #fecaca;}
 .btn-red:hover{background:#fecaca;}
-.btn-warm{background:#f97316;color:#fff;box-shadow:0 1px 4px rgba(249,115,22,.35);}
-.btn-warm:hover{background:#ea6c0a;}
+.btn-warm{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;box-shadow:0 1px 4px rgba(99,102,241,.4);}
+.btn-warm:hover{box-shadow:0 3px 10px rgba(99,102,241,.45);transform:translateY(-1px);}
 .btn-shuffle{background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;
   font-size:15px;font-weight:800;padding:10px 22px;border-radius:9px;
   box-shadow:0 3px 12px rgba(239,68,68,.4);letter-spacing:.3px;}
 .btn-shuffle:hover{box-shadow:0 5px 18px rgba(239,68,68,.5);transform:translateY(-1px);}
 
-.input{width:100%;padding:8px 11px;border:1.5px solid #e2e8f0;border-radius:7px;
+.input{width:100%;padding:8px 11px;border:1.5px solid #e2e8f0;border-radius:8px;
   font-size:13px;outline:none;transition:border .14s,box-shadow .14s;background:#fff;color:#0f172a;}
-.input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.14);}
+.input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.12);}
 textarea.input{resize:vertical;}
 
 .tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;}
@@ -70,10 +71,10 @@ textarea.input{resize:vertical;}
 .tag-NB{background:#f3effe;color:#7c3aed;}
 .tag-X{background:#f1f5f9;color:#64748b;}
 
-.modal-overlay{position:fixed;inset:0;background:rgba(10,20,40,.6);z-index:2000;
-  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
-.modal{background:#fff;border-radius:14px;padding:26px;min-width:420px;max-width:640px;
-  max-height:88vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.3);}
+.modal-overlay{position:fixed;inset:0;background:rgba(8,8,24,.65);z-index:2000;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal{background:#fff;border-radius:16px;padding:28px;min-width:420px;max-width:640px;
+  max-height:88vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.28),0 0 0 1px rgba(0,0,0,.06);}
 .section-lbl{font-size:10px;font-weight:700;text-transform:uppercase;
   letter-spacing:.9px;color:#94a3b8;margin-bottom:7px;}
 
@@ -84,9 +85,9 @@ textarea.input{resize:vertical;}
 }
 .print-hdr{display:none;}
 .fs-hud{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
-  background:rgba(20,15,10,.82);border-radius:14px;padding:12px 20px;
+  background:rgba(10,10,20,.88);border-radius:14px;padding:12px 20px;
   display:flex;gap:14px;align-items:center;z-index:500;
-  backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);}
+  backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);}
 </style>
 </head>
 <body>
@@ -385,7 +386,7 @@ function RoomCanvas({cls,updateClass,historyEntry,roomScale,isFS}){
       onPointerUp={readOnly?null:onUp}
       style={{width:PW,height:PH,position:'relative',userSelect:'none',
         touchAction:'none',
-        border:'2.5px solid #8b6c42',borderRadius:6,overflow:'hidden',
+        border:'2px solid rgba(120,80,40,.45)',borderRadius:8,overflow:'hidden',
         backgroundColor:'#c8955a',
         backgroundImage:[
           'repeating-linear-gradient(88deg,transparent 0px,transparent 38px,rgba(101,67,33,.06) 38px,rgba(101,67,33,.06) 40px)',
@@ -1538,20 +1539,25 @@ function SignInScreen({onSignIn}){
   };
   return(
     <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',
-      background:'linear-gradient(135deg,#1c1208 0%,#3d2b14 60%,#1c1208 100%)'}}>
-      <div style={{background:'#fff',borderRadius:18,padding:'44px 50px',
-        textAlign:'center',boxShadow:'0 32px 80px rgba(0,0,0,.45)',maxWidth:380,width:'90%'}}>
-        <div style={{fontSize:52,marginBottom:14}}>🪑</div>
+      background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 60%,#0f172a 100%)'}}>
+      <div style={{background:'#fff',borderRadius:20,padding:'44px 50px',
+        textAlign:'center',boxShadow:'0 32px 80px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.08)',maxWidth:380,width:'90%'}}>
+        <div style={{width:64,height:64,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+          borderRadius:18,display:'flex',alignItems:'center',justifyContent:'center',
+          fontSize:32,margin:'0 auto 18px',
+          boxShadow:'0 8px 24px rgba(99,102,241,.4)'}}>🪑</div>
         <div style={{fontSize:22,fontWeight:800,color:'#0f172a',marginBottom:6,letterSpacing:-.4}}>Seating Chart Builder</div>
         <div style={{fontSize:13.5,color:'#64748b',marginBottom:30,lineHeight:1.65}}>
           Sign in with your Google Workspace account to access your classes from any device.
         </div>
         <button onClick={handle} disabled={busy}
           style={{display:'flex',alignItems:'center',gap:11,padding:'13px 22px',
-            background:busy?'#f8fafc':'#fff',border:'2px solid #e2e8f0',borderRadius:10,
+            background:busy?'#f8fafc':'#fff',border:'1.5px solid #e2e8f0',borderRadius:11,
             cursor:busy?'default':'pointer',fontSize:14,fontWeight:600,color:'#1e293b',
             width:'100%',justifyContent:'center',
-            boxShadow:'0 2px 10px rgba(0,0,0,.08)',transition:'all .14s',opacity:busy?.7:1}}>
+            boxShadow:'0 2px 10px rgba(0,0,0,.07)',transition:'all .14s',opacity:busy?.7:1}}
+          onMouseEnter={e=>{if(!busy){e.currentTarget.style.borderColor='#c7d2fe';e.currentTarget.style.boxShadow='0 4px 16px rgba(99,102,241,.15)';}}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.boxShadow='0 2px 10px rgba(0,0,0,.07)';}}>
           <svg width="20" height="20" viewBox="0 0 24 24" style={{flexShrink:0}}>
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -1560,7 +1566,7 @@ function SignInScreen({onSignIn}){
           </svg>
           {busy?'Signing in…':'Sign in with Google'}
         </button>
-        {err&&<div style={{marginTop:14,fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:7,padding:'8px 12px',textAlign:'left'}}>⚠ {err}</div>}
+        {err&&<div style={{marginTop:14,fontSize:12,color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',textAlign:'left'}}>⚠ {err}</div>}
         <div style={{fontSize:11,color:'#94a3b8',marginTop:18,lineHeight:1.6}}>
           Uses your markdayschool.org account.<br/>Data syncs automatically across all browsers.
         </div>
@@ -1727,9 +1733,11 @@ function App(){
   if(!authReady){
     return(
       <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',
-        background:'#1c1208',flexDirection:'column',gap:14}}>
-        <div style={{fontSize:36}}>🪑</div>
-        <div style={{color:'rgba(255,255,255,.5)',fontSize:14}}>Loading…</div>
+        background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)',flexDirection:'column',gap:16}}>
+        <div style={{width:56,height:56,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+          borderRadius:16,display:'flex',alignItems:'center',justifyContent:'center',
+          fontSize:28,boxShadow:'0 8px 32px rgba(99,102,241,.5)'}}>🪑</div>
+        <div style={{color:'rgba(248,250,252,.45)',fontSize:13.5,fontWeight:500,letterSpacing:.2}}>Loading…</div>
       </div>
     );
   }
@@ -1750,14 +1758,16 @@ function App(){
         </div>
       </div>
       {!isFS&&cls.tables.length>0&&(
-        <div style={{display:'flex',gap:14,marginTop:10,flexWrap:'wrap',padding:'0 2px'}}>
+        <div style={{display:'flex',gap:10,marginTop:12,flexWrap:'wrap',padding:'0 2px'}}>
           {cls.tables.map((t,i)=>{
             const cnt=(cls.currentAssignment&&cls.currentAssignment[t.id]?.length)||0;
             return(
-              <div key={t.id} style={{display:'flex',alignItems:'center',gap:5}}>
-                <div style={{width:9,height:9,background:TCOLORS[i%TCOLORS.length],borderRadius:2}}/>
-                <span style={{fontSize:11.5,color:'#64748b',fontWeight:500}}>
-                  {t.label} <span style={{color:'#94a3b8'}}>({cnt})</span>
+              <div key={t.id} style={{display:'flex',alignItems:'center',gap:5,
+                padding:'3px 8px 3px 6px',background:'#fff',borderRadius:6,
+                border:'1px solid #e2e8f0',boxShadow:'0 1px 2px rgba(0,0,0,.04)'}}>
+                <div style={{width:8,height:8,background:TCOLORS[i%TCOLORS.length],borderRadius:2,flexShrink:0}}/>
+                <span style={{fontSize:11,color:'#475569',fontWeight:500}}>
+                  {t.label} <span style={{color:'#94a3b8',fontWeight:400}}>·{cnt}</span>
                 </span>
               </div>
             );
@@ -1765,23 +1775,31 @@ function App(){
         </div>
       )}
       {!isFS&&!cls.currentAssignment&&(
-        <div style={{marginTop:10,padding:'11px 16px',background:'rgba(255,251,235,.95)',
-          border:'1.5px solid #fde68a',borderRadius:9,fontSize:13,color:'#92400e',
-          maxWidth:PW*roomScale,lineHeight:1.6}}>
-          💡 Press <strong>🔀 Shuffle!</strong> to assign students to tables.
-          <span style={{color:'#b45309'}}> Click a table to rotate. Drag to reposition.</span>
+        <div style={{marginTop:12,padding:'11px 16px',
+          background:'rgba(238,242,255,.95)',
+          border:'1.5px solid #c7d2fe',borderRadius:10,fontSize:13,color:'#3730a3',
+          maxWidth:PW*roomScale,lineHeight:1.6,display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:16,flexShrink:0}}>💡</span>
+          <span>Press <strong>🔀 Shuffle!</strong> to assign students to tables.
+          <span style={{color:'#4f46e5',fontWeight:500}}> Click a table to rotate. Drag to reposition.</span></span>
         </div>
       )}
     </div>
   ):(
-    <div style={{textAlign:'center',padding:'60px 20px'}}>
-      <div style={{fontSize:64,marginBottom:16}}>🪑</div>
-      <div style={{fontSize:24,fontWeight:800,color:'#3d2b14',marginBottom:10}}>Seating Chart Builder</div>
-      <div style={{fontSize:15,color:'#78614a',marginBottom:28,lineHeight:1.6}}>
-        Create a class, add students, and hit Shuffle!
+    <div style={{textAlign:'center',padding:'70px 20px'}}>
+      <div style={{width:80,height:80,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+        borderRadius:24,display:'flex',alignItems:'center',justifyContent:'center',
+        fontSize:40,margin:'0 auto 20px',
+        boxShadow:'0 8px 32px rgba(99,102,241,.35)'}}>🪑</div>
+      <div style={{fontSize:24,fontWeight:800,color:'#0f172a',marginBottom:10,letterSpacing:-.5}}>
+        Seating Chart Builder
+      </div>
+      <div style={{fontSize:14.5,color:'#64748b',marginBottom:28,lineHeight:1.7,maxWidth:280,margin:'0 auto 28px'}}>
+        Create a class, add your students,<br/>and hit <strong style={{color:'#ef4444'}}>🔀 Shuffle!</strong> to assign seats.
       </div>
       <button className="btn btn-primary" onClick={()=>setModal('newClass')}
-        style={{fontSize:15,padding:'12px 28px',borderRadius:9}}>
+        style={{fontSize:15,padding:'12px 28px',borderRadius:10,background:'linear-gradient(135deg,#4f46e5,#6366f1)',
+          boxShadow:'0 4px 16px rgba(79,70,229,.4)'}}>
         + Create Your First Class
       </button>
     </div>
@@ -1793,51 +1811,54 @@ function App(){
       {/* ── Sidebar ── */}
       {sidebarVisible&&(
         <aside className="no-print" style={{width:SIDEBAR,
-          background:'linear-gradient(180deg,#251e14 0%,#1c1610 100%)',
+          background:'linear-gradient(180deg,#0f172a 0%,#0a0f1e 100%)',
           display:'flex',flexDirection:'column',flexShrink:0,
-          boxShadow:'2px 0 16px rgba(0,0,0,.28)'}}>
-          <div style={{padding:'14px 14px 12px',borderBottom:'1px solid rgba(255,255,255,.07)'}}>
-            <div style={{display:'flex',alignItems:'center',gap:9}}>
-              <div style={{width:32,height:32,
-                background:'linear-gradient(135deg,#c8955a,#8b6c42)',
-                borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:17,flexShrink:0,boxShadow:'0 2px 8px rgba(139,108,66,.5)'}}>🪑</div>
+          boxShadow:'1px 0 0 rgba(255,255,255,.06),4px 0 24px rgba(0,0,0,.4)'}}>
+          <div style={{padding:'16px 14px 13px',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div style={{width:34,height:34,
+                background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:17,flexShrink:0,boxShadow:'0 2px 10px rgba(99,102,241,.5)'}}>🪑</div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:800,color:'#f5e6c8',letterSpacing:-.3}}>Seating Chart</div>
-                <div style={{fontSize:9.5,color:'rgba(245,230,200,.3)'}}>Classroom Builder</div>
+                <div style={{fontSize:14,fontWeight:800,color:'#f8fafc',letterSpacing:-.3,lineHeight:1.2}}>Seating Chart</div>
+                <div style={{fontSize:9.5,color:'rgba(248,250,252,.3)',letterSpacing:.2}}>Classroom Builder</div>
               </div>
             </div>
             {fbUser&&(
-              <div style={{display:'flex',alignItems:'center',gap:7,marginTop:10,
-                padding:'7px 8px',background:'rgba(255,255,255,.07)',borderRadius:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:11,
+                padding:'7px 9px',background:'rgba(255,255,255,.06)',borderRadius:9,
+                border:'1px solid rgba(255,255,255,.06)'}}>
                 {fbUser.photoURL&&(
                   <img src={fbUser.photoURL} alt="" referrerPolicy="no-referrer"
-                    style={{width:24,height:24,borderRadius:'50%',border:'1.5px solid rgba(245,230,200,.2)',flexShrink:0}}/>
+                    style={{width:24,height:24,borderRadius:'50%',border:'1.5px solid rgba(99,102,241,.4)',flexShrink:0}}/>
                 )}
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:11,fontWeight:600,color:'rgba(245,230,200,.8)',
+                  <div style={{fontSize:11,fontWeight:600,color:'rgba(248,250,252,.85)',
                     overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {fbUser.displayName||fbUser.email}
                   </div>
-                  <div style={{fontSize:9,color:'rgba(245,230,200,.3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  <div style={{fontSize:9,color:'rgba(248,250,252,.3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {fbUser.email}
                   </div>
                 </div>
                 <button onClick={signOut}
-                  style={{border:'1px solid rgba(245,230,200,.15)',background:'transparent',
-                    color:'rgba(245,230,200,.4)',borderRadius:5,padding:'2px 6px',
-                    cursor:'pointer',fontSize:10,flexShrink:0}}>
+                  style={{border:'1px solid rgba(248,250,252,.12)',background:'transparent',
+                    color:'rgba(248,250,252,.4)',borderRadius:6,padding:'3px 7px',
+                    cursor:'pointer',fontSize:10,flexShrink:0,transition:'all .12s'}}
+                  onMouseEnter={e=>{e.target.style.background='rgba(255,255,255,.08)';e.target.style.color='rgba(248,250,252,.7)';}}
+                  onMouseLeave={e=>{e.target.style.background='transparent';e.target.style.color='rgba(248,250,252,.4)';}}>
                   Sign out
                 </button>
               </div>
             )}
           </div>
 
-          <div style={{flex:1,overflowY:'auto',padding:'9px 9px 0'}}>
-            <div style={{fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:.9,
-              color:'rgba(245,230,200,.28)',padding:'0 5px',marginBottom:5}}>Classes</div>
+          <div style={{flex:1,overflowY:'auto',padding:'10px 10px 0'}}>
+            <div style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:1.1,
+              color:'rgba(248,250,252,.22)',padding:'0 6px',marginBottom:6}}>Classes</div>
             {!data.classes.length&&(
-              <div style={{fontSize:12,color:'rgba(245,230,200,.2)',textAlign:'center',padding:'18px 0',lineHeight:1.7}}>
+              <div style={{fontSize:12,color:'rgba(248,250,252,.18)',textAlign:'center',padding:'20px 8px',lineHeight:1.7}}>
                 No classes yet.<br/>Create one below!
               </div>
             )}
@@ -1845,59 +1866,66 @@ function App(){
               const active=data.activeClassId===c.id;
               return(
                 <div key={c.id} onClick={()=>setData(prev=>({...prev,activeClassId:c.id}))}
-                  style={{display:'flex',alignItems:'center',padding:'8px 9px',borderRadius:9,
-                    cursor:'pointer',marginBottom:2,transition:'all .13s',
-                    background:active?'rgba(200,149,90,.18)':'transparent',
-                    border:`1px solid ${active?'rgba(200,149,90,.35)':'transparent'}`}}>
+                  style={{display:'flex',alignItems:'center',padding:'8px 10px',borderRadius:9,
+                    cursor:'pointer',marginBottom:2,transition:'all .12s',
+                    background:active?'rgba(99,102,241,.18)':'transparent',
+                    border:`1px solid ${active?'rgba(99,102,241,.35)':'transparent'}`}}
+                  onMouseEnter={e=>{if(!active)e.currentTarget.style.background='rgba(255,255,255,.05)';}}
+                  onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
                   <div style={{width:3,height:28,borderRadius:3,marginRight:9,flexShrink:0,
-                    background:active?TCOLORS[ci%TCOLORS.length]:'transparent',transition:'background .13s'}}/>
+                    background:active?TCOLORS[ci%TCOLORS.length]:'rgba(255,255,255,.08)',transition:'background .12s'}}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12.5,fontWeight:600,color:active?'#f5e6c8':'#a09070',
+                    <div style={{fontSize:12.5,fontWeight:600,color:active?'#f8fafc':'rgba(248,250,252,.55)',
                       whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.name}</div>
-                    <div style={{fontSize:10,color:'rgba(245,230,200,.22)',marginTop:1}}>
+                    <div style={{fontSize:9.5,color:'rgba(248,250,252,.2)',marginTop:1.5}}>
                       {c.students.length} students · {c.tables.length} tables
                     </div>
                   </div>
                   <button onClick={e=>{e.stopPropagation();deleteClass(c.id);}}
-                    style={{border:'none',background:'none',color:'rgba(245,230,200,.18)',cursor:'pointer',
-                      fontSize:15,padding:'2px 4px',lineHeight:1,flexShrink:0}}>×</button>
+                    style={{border:'none',background:'none',color:'rgba(248,250,252,.15)',cursor:'pointer',
+                      fontSize:16,padding:'2px 5px',lineHeight:1,flexShrink:0,transition:'color .12s',borderRadius:4}}
+                    onMouseEnter={e=>e.target.style.color='rgba(248,100,100,.7)'}
+                    onMouseLeave={e=>e.target.style.color='rgba(248,250,252,.15)'}>×</button>
                 </div>
               );
             })}
           </div>
 
-          <div style={{padding:'8px 9px'}}>
+          <div style={{padding:'10px 10px'}}>
             <button className="btn btn-warm" onClick={()=>setModal('newClass')}
-              style={{width:'100%',justifyContent:'center',fontSize:13,padding:'8px',borderRadius:8}}>
+              style={{width:'100%',justifyContent:'center',fontSize:13,padding:'9px',borderRadius:9}}>
               + New Class
             </button>
           </div>
 
           {cls&&cls.seatingHistory.length>0&&(
-            <div style={{padding:'9px 9px 10px',borderTop:'1px solid rgba(255,255,255,.06)'}}>
-              <div style={{fontSize:9.5,fontWeight:700,textTransform:'uppercase',letterSpacing:.9,
-                color:'rgba(245,230,200,.28)',padding:'0 5px',marginBottom:5}}>Recent</div>
+            <div style={{padding:'8px 10px 10px',borderTop:'1px solid rgba(255,255,255,.05)'}}>
+              <div style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:1.1,
+                color:'rgba(248,250,252,.22)',padding:'0 6px',marginBottom:6}}>Recent Shuffles</div>
               {cls.seatingHistory.slice(0,3).map(h=>(
-                <div key={h.id} style={{fontSize:10,color:'rgba(245,230,200,.35)',
-                  padding:'3px 6px',borderRadius:4,marginBottom:2,background:'rgba(255,255,255,.04)'}}>
+                <div key={h.id} style={{fontSize:10,color:'rgba(248,250,252,.3)',
+                  padding:'4px 7px',borderRadius:5,marginBottom:2,background:'rgba(255,255,255,.04)',
+                  border:'1px solid rgba(255,255,255,.04)'}}>
                   {fmt(h.date)}
                 </div>
               ))}
               <button onClick={()=>setModal('history')}
-                style={{background:'none',border:'1px solid rgba(255,255,255,.1)',
-                  color:'rgba(245,230,200,.45)',borderRadius:6,padding:'5px 10px',
-                  cursor:'pointer',fontSize:11,width:'100%',marginTop:4}}>
-                All History ({cls.seatingHistory.length})
+                style={{background:'transparent',border:'1px solid rgba(255,255,255,.09)',
+                  color:'rgba(248,250,252,.4)',borderRadius:7,padding:'6px 10px',
+                  cursor:'pointer',fontSize:11,width:'100%',marginTop:5,transition:'all .12s',fontWeight:500}}
+                onMouseEnter={e=>{e.target.style.background='rgba(255,255,255,.06)';e.target.style.color='rgba(248,250,252,.7)';}}
+                onMouseLeave={e=>{e.target.style.background='transparent';e.target.style.color='rgba(248,250,252,.4)';}}>
+                View All History ({cls.seatingHistory.length})
               </button>
             </div>
           )}
 
           {FB_READY&&fbUser&&(
-            <div style={{padding:'8px 14px',borderTop:'1px solid rgba(255,255,255,.06)',
-              display:'flex',alignItems:'center',gap:6}}>
+            <div style={{padding:'8px 14px',borderTop:'1px solid rgba(255,255,255,.05)',
+              display:'flex',alignItems:'center',gap:7}}>
               <div style={{width:6,height:6,borderRadius:'50%',flexShrink:0,
-                background:syncSt==='synced'?'#10b981':syncSt==='syncing'?'#f59e0b':syncSt==='error'?'#ef4444':'#64748b'}}/>
-              <span style={{fontSize:10,color:'rgba(245,230,200,.3)'}}>
+                background:syncSt==='synced'?'#10b981':syncSt==='syncing'?'#f59e0b':syncSt==='error'?'#ef4444':'#475569'}}/>
+              <span style={{fontSize:10,color:'rgba(248,250,252,.28)',fontWeight:500}}>
                 {syncSt==='synced'?'Saved to cloud':syncSt==='syncing'?'Saving…':syncSt==='error'?'Save error':'Local only'}
               </span>
             </div>
@@ -1908,29 +1936,39 @@ function App(){
       {/* ── Main ── */}
       <main style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
         {!isFS&&(
-          <div className="no-print" style={{background:'#fff',borderBottom:'1px solid #e8ddd0',
-            padding:'8px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0,
-            boxShadow:'0 1px 5px rgba(139,108,66,.1)'}}>
+          <div className="no-print" style={{background:'#fff',borderBottom:'1px solid #e2e8f0',
+            padding:'8px 18px',display:'flex',alignItems:'center',gap:10,flexShrink:0,
+            boxShadow:'0 1px 0 #e2e8f0,0 2px 8px rgba(15,23,42,.05)'}}>
             {cls?(
               <>
-                <div style={{display:'flex',alignItems:'center',gap:7,minWidth:0}}>
-                  <div style={{width:7,height:7,borderRadius:'50%',background:'#c8955a',flexShrink:0}}/>
-                  <span style={{fontWeight:700,fontSize:15.5,color:'#3d2b14',
+                <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:'#6366f1',flexShrink:0,
+                    boxShadow:'0 0 0 2px rgba(99,102,241,.2)'}}/>
+                  <span style={{fontWeight:700,fontSize:15,color:'#0f172a',
                     whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{cls.name}</span>
                   <button onClick={()=>setModal('rename')}
-                    style={{border:'1px solid #e8ddd0',background:'#faf7f2',borderRadius:5,
-                      cursor:'pointer',fontSize:11,padding:'2px 8px',color:'#78614a',flexShrink:0}}>✏️</button>
+                    style={{border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:6,
+                      cursor:'pointer',fontSize:11,padding:'3px 9px',color:'#64748b',flexShrink:0,
+                      transition:'all .12s',fontWeight:500}}
+                    onMouseEnter={e=>{e.target.style.background='#f1f5f9';e.target.style.borderColor='#cbd5e1';}}
+                    onMouseLeave={e=>{e.target.style.background='#f8fafc';e.target.style.borderColor='#e2e8f0';}}>✏ Rename</button>
                 </div>
                 <div style={{flex:1}}/>
-                {last&&<div style={{fontSize:11,color:'#94a3b8',whiteSpace:'nowrap'}}>Last: {last}</div>}
-                <button className="btn btn-ghost" onClick={()=>setModal('history')} style={{fontSize:12.5}}>📅 History</button>
+                {last&&<div style={{fontSize:11,color:'#94a3b8',whiteSpace:'nowrap',fontWeight:500}}>Last shuffle: {last}</div>}
+                <div style={{width:1,height:20,background:'#e2e8f0',flexShrink:0}}/>
+                <button className="btn btn-ghost" onClick={()=>setModal('history')} style={{fontSize:12.5,gap:4}}>
+                  <span style={{fontSize:13}}>📅</span> History
+                </button>
                 <div style={{position:'relative',flexShrink:0}}>
                   <button className="btn btn-ghost" onClick={()=>setShowExport(v=>!v)}
-                    style={{fontSize:12.5}}>⬆ Export</button>
+                    style={{fontSize:12.5,gap:4}}>
+                    <span style={{fontSize:13}}>⬆</span> Export
+                  </button>
                   {showExport&&(
-                    <div style={{position:'absolute',top:'calc(100% + 4px)',right:0,
-                      background:'#fff',border:'1px solid #e2e8f0',borderRadius:7,
-                      boxShadow:'0 4px 16px rgba(0,0,0,.12)',zIndex:200,overflow:'hidden',minWidth:120}}>
+                    <div style={{position:'absolute',top:'calc(100% + 6px)',right:0,
+                      background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,
+                      boxShadow:'0 8px 24px rgba(0,0,0,.12),0 1px 0 rgba(0,0,0,.04)',
+                      zIndex:200,overflow:'hidden',minWidth:132}}>
                       {[
                         ['⬇ CSV',()=>{handleExportCSV();setShowExport(false);},(!!cls.currentAssignment)],
                         ['🖨 Print',()=>{window.print();setShowExport(false);},true],
@@ -1940,8 +1978,8 @@ function App(){
                           style={{display:'block',width:'100%',border:'none',background:'none',
                             cursor:enabled?'pointer':'default',fontSize:12.5,padding:'9px 14px',
                             textAlign:'left',color:enabled?'#1e293b':'#94a3b8',
-                            transition:'background .1s'}}
-                          onMouseEnter={e=>enabled&&(e.target.style.background='#f8f4f0')}
+                            transition:'background .1s',fontWeight:enabled?500:400}}
+                          onMouseEnter={e=>enabled&&(e.target.style.background='#f8fafc')}
                           onMouseLeave={e=>e.target.style.background='none'}>{lbl}</button>
                       ))}
                     </div>
@@ -1949,7 +1987,10 @@ function App(){
                 </div>
                 <button className="btn btn-ghost" onClick={toggleFS}
                   title="Full-screen presentation mode"
-                  style={{fontSize:13,padding:'8px 12px'}}>⛶ Present</button>
+                  style={{fontSize:12.5,gap:4,padding:'8px 12px'}}>
+                  <span style={{fontSize:13}}>⛶</span> Present
+                </button>
+                <div style={{width:1,height:20,background:'#e2e8f0',flexShrink:0}}/>
                 <button className="btn btn-shuffle" onClick={handleShuffle}
                   style={{animation:shuffleAnim?'shufflePop .65s ease':'none'}}>
                   🔀 Shuffle!
@@ -1957,36 +1998,38 @@ function App(){
               </>
             ):(
               <>
-                <div style={{color:'#94a3b8',fontSize:13.5,flex:1}}>← Select or create a class to get started</div>
-                <button className="btn btn-ghost" onClick={toggleFS} style={{fontSize:13}}>⛶ Present</button>
+                <div style={{color:'#94a3b8',fontSize:13,flex:1,fontWeight:500}}>
+                  ← Select or create a class to get started
+                </div>
+                <button className="btn btn-ghost" onClick={toggleFS} style={{fontSize:12.5}}>⛶ Present</button>
               </>
             )}
           </div>
         )}
 
         <div style={{flex:1,overflow:'auto',
-          padding:isFS?'8px':'20px',
+          padding:isFS?'8px':'24px',
           display:'flex',alignItems:isFS?'center':'flex-start',
           justifyContent:'center',
-          background:isFS?'#0f0a05':'linear-gradient(135deg,#ede8df 0%,#e5ddd4 100%)'}}>
+          background:isFS?'#080810':'#f1f5f9'}}>
           <RoomDisplay/>
         </div>
       </main>
 
       {/* ── Right Panel ── */}
       {panelVisible&&(
-        <aside className="no-print" style={{width:PANEL,background:'#fdfaf6',
-          borderLeft:'1px solid #e8ddd0',display:'flex',flexDirection:'column',
-          flexShrink:0,overflow:'hidden',boxShadow:'-2px 0 8px rgba(139,108,66,.08)'}}>
-          <div style={{display:'flex',borderBottom:'1px solid #e8ddd0',flexShrink:0,background:'#faf7f2'}}>
+        <aside className="no-print" style={{width:PANEL,background:'#ffffff',
+          borderLeft:'1px solid #e2e8f0',display:'flex',flexDirection:'column',
+          flexShrink:0,overflow:'hidden',boxShadow:'-1px 0 0 #e2e8f0,-4px 0 16px rgba(15,23,42,.04)'}}>
+          <div style={{display:'flex',borderBottom:'1px solid #e2e8f0',flexShrink:0,background:'#fff'}}>
             {[['students','👥','Students'],['tables','🟦','Tables'],['settings','⚙️','Settings'],['notes','📝','Notes'],['roster','🏫','Roster']].map(([tab,icon,lbl])=>(
               <button key={tab} onClick={()=>setRightTab(tab)}
-                style={{flex:1,padding:'9px 3px',border:'none',cursor:'pointer',fontSize:10.5,
+                style={{flex:1,padding:'10px 3px',border:'none',cursor:'pointer',fontSize:10,
                   fontWeight:600,background:'transparent',transition:'all .13s',
-                  color:rightTab===tab?'#c8955a':'#64748b',
-                  borderBottom:`2.5px solid ${rightTab===tab?'#c8955a':'transparent'}`,
+                  color:rightTab===tab?'#4f46e5':'#64748b',
+                  borderBottom:`2.5px solid ${rightTab===tab?'#4f46e5':'transparent'}`,
                   marginBottom:'-1px'}}>
-                <div style={{fontSize:14,marginBottom:2}}>{icon}</div>{lbl}
+                <div style={{fontSize:15,marginBottom:2}}>{icon}</div>{lbl}
               </button>
             ))}
           </div>
@@ -1998,17 +2041,17 @@ function App(){
             {rightTab==='notes'&&<SchoolNotesPanel cls={cls} fbUser={fbUser}/>}
             {rightTab==='roster'&&<RosterPanel fbUser={fbUser} createClassFromRoster={createClassFromRoster}/>}
           </div>
-          <div style={{padding:'9px 14px',borderTop:'1px solid #e8ddd0',background:'#faf7f2',flexShrink:0}}>
+          <div style={{padding:'10px 14px',borderTop:'1px solid #e2e8f0',background:'#f8fafc',flexShrink:0}}>
             <div style={{display:'flex'}}>
-              {[[cls.students.length,'#c8955a','Students'],
+              {[[cls.students.length,'#4f46e5','Students'],
                 [cls.tables.length,'#10b981','Tables'],
                 [cls.seatingHistory.length,'#f97316','Shuffles'],
                 [cls.students.filter(s=>!cls.constraints.excludedStudents.includes(s.id)).length,'#8b5cf6','Active'],
               ].map(([v,col,lbl],i,arr)=>(
                 <div key={lbl} style={{flex:1,textAlign:'center',
-                  borderRight:i<arr.length-1?'1px solid #e8ddd0':'none'}}>
-                  <div style={{fontSize:17,fontWeight:800,color:col,lineHeight:1.2}}>{v}</div>
-                  <div style={{fontSize:9,color:'#94a3b8',textTransform:'uppercase',letterSpacing:.4,marginTop:1}}>{lbl}</div>
+                  borderRight:i<arr.length-1?'1px solid #e2e8f0':'none',padding:'2px 0'}}>
+                  <div style={{fontSize:18,fontWeight:800,color:col,lineHeight:1.2}}>{v}</div>
+                  <div style={{fontSize:9,color:'#94a3b8',textTransform:'uppercase',letterSpacing:.5,marginTop:2,fontWeight:600}}>{lbl}</div>
                 </div>
               ))}
             </div>
