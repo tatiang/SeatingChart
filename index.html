@@ -25,7 +25,6 @@ if (window.FB_READY) {
   window.fbAuth = firebase.auth();
   window.fbDb   = firebase.firestore();
   const p = new firebase.auth.GoogleAuthProvider();
-  p.setCustomParameters({ hd: 'markdayschool.org' });
   window.gProvider = p;
 }
 </script>
@@ -1181,7 +1180,7 @@ function SchoolNotesPanel({cls,fbUser}){
 async function getSheetsToken(userEmail){
   const provider=new firebase.auth.GoogleAuthProvider();
   provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
-  if(userEmail)provider.setCustomParameters({login_hint:userEmail,hd:'markdayschool.org'});
+  if(userEmail)provider.setCustomParameters({login_hint:userEmail});
   const result=await firebase.auth().signInWithPopup(provider);
   return result.credential?.accessToken||null;
 }
