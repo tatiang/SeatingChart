@@ -11,3 +11,5 @@
 .seat,.roster-student{touch-action:none}.seat.drop-target{outline:3px solid #2465ed;background:#deedff}.roster-student{user-select:none}
 
 .roster-student{touch-action:pan-y}.drag-handle{touch-action:none}
+
+.room-surface .shape-round{border-radius:45%;padding:20px}.room-surface .shape-oval{border-radius:35%;padding:16px}.shape-round:before,.shape-round:after{display:none}.object-editor{display:flex;align-items:end;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px}.object-editor label{width:70px}.object-editor strong{width:100%;font-size:13px}.furniture{display:grid;place-items:center;font-size:15px;border-radius:6px;overflow:hidden;white-space:pre-wrap;text-align:center}.whiteboard{background:#26374c;color:#fff;border:3px solid #50637b;letter-spacing:2px;box-shadow:0 4px 8px #14234825}.room-scroll{min-height:0!important}

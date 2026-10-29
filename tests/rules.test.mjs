@@ -16,7 +16,7 @@ try{
  await assertFails(getDoc(doc(colleague,'sharedViews/expired')));
  await assertSucceeds(getDoc(doc(colleague,'sharedViews/live')));
  await assertSucceeds(getDocs(query(collection(teacher,'sharedViews'),where('ownerUid','==','teacher'))));
- await assertSucceeds(setDoc(doc(teacher,'sharedViews/new'),{ownerUid:'teacher',expiresAt:Timestamp.fromMillis(now+3600000),chart:{name:'Synthetic'}}));
+ await assertSucceeds(setDoc(doc(teacher,'sharedViews/new'),{ownerUid:'teacher',expiresAt:Timestamp.fromMillis(now+3600000),chart:{name:'Synthetic',room:{width:1100,height:600}} }));
  await assertFails(setDoc(doc(colleague,'sharedViews/new'),{ownerUid:'teacher',expiresAt:Timestamp.fromMillis(now+3600000),chart:{name:'Tampered'}}));
  await assertFails(setDoc(doc(teacher,'sharedViews/forever'),{ownerUid:'teacher',expiresAt:Timestamp.fromMillis(now+30*86400000),chart:{}}));
  await assertFails(setDoc(doc(teacher,'facultyAccess/teacher'),{expiresAt:Timestamp.fromMillis(now+99999999)}));

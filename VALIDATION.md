@@ -36,3 +36,12 @@ At `http://localhost:4173/?demo=1`:
 - Current production Firestore rules inspection and backup, legacy note migration, both pull requests, deployment and live portfolio link verification.
 
 These checks were deliberately not represented as completed.
+
+## Creativity Lab increment — Oct 29, 2026
+- `npm run check`: PASS, 14 model/policy tests and production build. An initial grid-position test failed and was corrected by placing presets on the snap grid.
+- `JAVA_HOME=/private/tmp/seating-jdk21/Contents/Home PATH=/private/tmp/seating-jdk21/Contents/Home/bin:$PATH XDG_CACHE_HOME=/private/tmp/seating-firebase-cache npm run test:rules`: PASS, including shared room metadata.
+- `git diff --check`: PASS.
+- Browser: Room designer → rows → Apply → Confirm shows 12 desks/24 seats; Undo restores six tables and all 16 fictional students.
+- Select Table 1 → Shape → oval changes the table; Room designer → width 1200 → Resize → Screen right moves the screen; Add room object creates editable Supplies note.
+- Desktop 1440×900 and phone 390×844 visually show six tables and right-side screen. Room fitting now measures both viewport dimensions before paint.
+- Production login/deployment remains outside this local demo verification.

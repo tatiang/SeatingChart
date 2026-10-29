@@ -1,3 +1,7 @@
+Oct 29, 2026 — 4:57 PM PT — HEAD — Added the Creativity Lab room designer
+- Added six-table landscape layout with a right-side screen, classroom presets, editable room size, table shapes and sizes, snap movement and room objects.
+- Preserved room dimensions in templates, history and shared charts; verified responsive fitting and Undo.
+
 Oct 29, 2026 — 4:40 PM PT — HEAD — Approved Faculty accounts without organizational-unit checks
 - Replaced the Directory integration with individual, expiring administrator-approved Faculty accounts.
 - Removed the Google APIs dependency; school domain alone still cannot grant access.

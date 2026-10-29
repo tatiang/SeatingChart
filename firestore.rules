@@ -29,7 +29,7 @@ service cloud.firestore {
     && request.resource.data.expiresAt > request.time
     && request.resource.data.expiresAt <= request.time + duration.value(7, 'd')
     && request.resource.data.chart is map
-    && request.resource.data.chart.keys().hasOnly(['name','tables','screen','furniture','currentAssignment','students','includeGender']);
+    && request.resource.data.chart.keys().hasOnly(['name','room','tables','screen','furniture','currentAssignment','students','includeGender']);
    allow update: if false;
    allow delete: if faculty() && resource.data.ownerUid == request.auth.uid;
   }

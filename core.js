@@ -11,8 +11,27 @@
     if (!d || !Array.isArray(d.classes)) throw Error("Unrecognized saved data. No changes were saved.");
     return { ...clone(d), version: 2, preferences: { showGender: false, nameStyle: "first", genderColors: colors, ...d.preferences }, templates: d.templates || [], classes: d.classes.map((c) => ({ ...c, students: (c.students || []).map(student), tables: (c.tables || []).map((t) => ({ ...t, seats: Math.max(t.seats || 4, (c.currentAssignment?.[t.id] || []).length) })), furniture: c.furniture || [], seatingHistory: c.seatingHistory || [], constraints: { excludedStudents: [], keepApart: [], genderMode: "mixed", ...c.constraints }, lockedStudents: c.lockedStudents || [], screen: c.screen || { x: 300, y: 8, orientation: "H" } })) };
   }
+  function roomSize(c) { return { width: c.room?.width || 840, height: c.room?.height || 520 }; }
+  function tableDimensions(c, t) {
+    if (t.width && t.height) return t.orientation === "V" ? [t.height, t.width] : [t.width, t.height];
+    if (c.tableSize) { const [w,h] = ({sm:[50,100],md:[70,140],lg:[90,180]})[c.tableSize] || [50,100]; return t.orientation === "H" ? [h,w] : [w,h]; }
+    return t.seats === 1 ? [110,90] : t.orientation === "V" ? [114,190] : [190,114];
+  }
+  function boundTable(c, t, x=t.x, y=t.y) {
+    const r=roomSize(c), [w,h]=tableDimensions(c,t), snap=c.room?.snap ? 10 : 1;
+    return {...t,x:Math.max(0,Math.min(r.width-w,Math.round(x/snap)*snap)),y:Math.max(0,Math.min(r.height-h,Math.round(y/snap)*snap))};
+  }
+  function layoutPreset(kind="lab") {
+    const room={width:1100,height:600,snap:true}, screen={x:1035,y:190,orientation:"V",label:"SCREEN"};
+    let positions=Array.from({length:6},(_,i)=>[70+i%3*260,100+Math.floor(i/3)*270]);
+    let seats=4;
+    if(kind==="rows") {positions=Array.from({length:12},(_,i)=>[70+i%4*210,80+Math.floor(i/4)*170]);seats=2;}
+    if(kind==="horseshoe") positions=[[80,70],[80,240],[80,410],[360,70],[360,410],[640,70],[640,410]];
+    if(kind==="pods") positions=[[80,100],[410,100],[740,100],[80,370],[410,370],[740,370]];
+    return {room,screen,tables:positions.map(([x,y],i)=>({id:id(),label:`Table ${i+1}`,x,y,seats,orientation:"H",shape:kind==="pods"?"round":"rectangle",width:kind==="pods"?180:200,height:kind==="pods"?180:130})),furniture:[]};
+  }
   function makeClass(name) {
-    return { id: id(), name, students: [], tables: Array.from({ length: 6 }, (_, i) => ({ id: id(), label: `Table ${i + 1}`, orientation: "H", seats: 4, x: 60 + i % 3 * 260, y: 70 + Math.floor(i / 3) * 170 })), screen: { x: 300, y: 8, orientation: "H" }, furniture: [], seatingHistory: [], currentAssignment: {}, constraints: { genderMode: "mixed", excludedStudents: [], keepApart: [] }, lockedStudents: [] };
+    return { id: id(), name, students: [], ...layoutPreset(), seatingHistory: [], currentAssignment: {}, constraints: { genderMode: "mixed", excludedStudents: [], keepApart: [] }, lockedStudents: [] };
   }
   function display(s, style = "first") {
     if (!s) return "Empty seat";
@@ -154,9 +173,9 @@
     }).filter((s) => s.name);
   }
   function snapshot(c, includeGender = false) {
-    return { name: c.name, tables: clone(c.tables), screen: clone(c.screen), furniture: clone(c.furniture || []), currentAssignment: clone(c.currentAssignment || {}), students: c.students.map((s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, preferredName: s.preferredName || "", name: s.name, ...includeGender ? { gender: s.gender || "" } : {} })), includeGender };
+    return { name: c.name, room: clone(roomSize(c)), tables: clone(c.tables), screen: clone(c.screen), furniture: clone(c.furniture || []), currentAssignment: clone(c.currentAssignment || {}), students: c.students.map((s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, preferredName: s.preferredName || "", name: s.name, ...includeGender ? { gender: s.gender || "" } : {} })), includeGender };
   }
-  const api = { clone, id, colors, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
+  const api = { roomSize, tableDimensions, boundTable, layoutPreset, clone, id, colors, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
   if (typeof module !== "undefined") module.exports = api;
   else root.Seating = api;
 })(globalThis);

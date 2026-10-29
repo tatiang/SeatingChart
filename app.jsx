@@ -1,4 +1,4 @@
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useLayoutEffect, useRef } = React;
 const S = Seating;
 const paths = { seats: "M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M15 15h6v6h-6z", students: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75", history: "M12 8v4l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0", templates: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z", settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2", plus: "M12 4v16 M4 12h16", move: "M4 3l6 17 3-7 7-3z", rotate: "M20 7v-4 M20 7h-4 M20 7a9 9 0 1 0 1 8", shuffle: "M3 7h3c5 0 7 10 12 10h3 M18 14l3 3-3 3 M3 17h3c2 0 3-1 4-3 M14 8c1-1 2-1 4-1h3 M18 4l3 3-3 3", clear: "M4 8h16 M9 8V4h6v4 M6 8l1 13h10l1-13", print: "M6 9V3h12v6 M6 18H3V9h18v9h-3 M6 14h12v7H6z", share: "M10 13l4-4 M8 16l-2 2a4 4 0 0 1-6-6l5-5 M16 8l2-2a4 4 0 0 1 6 6l-5 5", search: "M21 21l-6-6 M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0", room: "M4 21V3h16v18 M8 21V8h8v13", list: "M9 5h12 M9 12h12 M9 19h12 M3 5h1 M3 12h1 M3 19h1", undo: "M8 3L3 8l5 5 M3 8h10a7 7 0 0 1 0 14", redo: "M16 3l5 5-5 5 M21 8H11a7 7 0 0 0 0 14", help: "M9 9a3 3 0 1 1 5 2l-2 2 M12 17h.01 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0" };
 function Icon({ name }) {
@@ -72,12 +72,15 @@ function App() {
   const demo = new URLSearchParams(location.search).get("demo") === "1";
   const [user, setUser] = useState(null), [phase, setPhase] = useState(demo ? "ready" : "loading"), [data, setData] = useState(() => demo ? Demo() : null), [error, setError] = useState(""), [sync, setSync] = useState(demo ? "Demo \xB7 not saved" : "Loading"), [tab, setTab] = useState("Seats"), [view, setView] = useState("room"), [modal, setModal] = useState(null), [selected, setSelected] = useState(null), [search, setSearch] = useState(""), [picked, setPicked] = useState(null), [zoom, setZoom] = useState(1), [drawer, setDrawer] = useState(""), [preview, setPreview] = useState(null), [archived, setArchived] = useState(false), [shared, setShared] = useState(null), [links, setLinks] = useState([]), [outputGender, setOutputGender] = useState(false);
   const viewport = useRef(null), [fit, setFit] = useState(1);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!viewport.current) return;
-    const observer = new ResizeObserver(([entry]) => setFit(Math.min(1.3, entry.contentRect.width / 840)));
+    const room = S.roomSize(data?.classes.find(x => x.id === data.activeClassId) || {});
+    const resize = () => setFit(Math.min(1.3, viewport.current.clientWidth / room.width, viewport.current.clientHeight / room.height));
+    resize();
+    const observer = new ResizeObserver(resize);
     observer.observe(viewport.current);
     return () => observer.disconnect();
-  }, [phase, tab, !!data?.activeClassId]);
+  }, [phase, tab, data?.activeClassId, data?.classes.find(x => x.id === data.activeClassId)?.room?.width, data?.classes.find(x => x.id === data.activeClassId)?.room?.height]);
   const suppressStudentClick = useRef(false);
   const past = useRef([]), future = useRef([]), dirty = useRef(false), revision = useRef(0), session = useRef(0), saveChain = useRef(Promise.resolve()), [undoTick, setUndoTick] = useState(0);
   const c = data?.classes.find((c2) => c2.id === data.activeClassId), prefs = data?.preferences || { showGender: false, nameStyle: "first", genderColors: S.colors };
@@ -221,7 +224,7 @@ function App() {
     setDrawer("");
     setData((d) => ({ ...d, activeClassId: id }));
   };
-  const saveArrangement = (assignment, label = "Seating arrangement") => update((x) => ({ ...x, currentAssignment: assignment, seatingHistory: [{ id: S.id(), date: (/* @__PURE__ */ new Date()).toISOString(), name: label, assignment: S.clone(assignment), tables: S.clone(x.tables), screen: S.clone(x.screen), furniture: S.clone(x.furniture) }, ...x.seatingHistory] }));
+  const saveArrangement = (assignment, label = "Seating arrangement") => update((x) => ({ ...x, currentAssignment: assignment, seatingHistory: [{ id: S.id(), date: (/* @__PURE__ */ new Date()).toISOString(), name: label, assignment: S.clone(assignment), room: S.roomSize(x), tables: S.clone(x.tables), screen: S.clone(x.screen), furniture: S.clone(x.furniture) }, ...x.seatingHistory] }));
   const addTable = (seats = 4) => {
     const id = S.id();
     update((x) => ({ ...x, tables: [...x.tables, { id, label: seats === 1 ? "Individual seat" : `Table ${x.tables.length + 1}`, seats, orientation: "H", x: 60 + x.tables.length % 3 * 260, y: 70 + Math.floor(x.tables.length / 3) % 2 * 170 }] }));
@@ -229,7 +232,7 @@ function App() {
     setTab("Seats");
   };
   const changeTable = (fn) => update((x) => {
-    const tables = x.tables.map((t) => t.id === selected ? fn(t) : t);
+    const tables = x.tables.map((t) => t.id === selected ? S.boundTable(x,fn(t)) : t);
     const limit = tables.find((t) => t.id === selected)?.seats;
     const removed = (x.currentAssignment?.[selected] || []).slice(limit);
     return { ...x, tables, currentAssignment: { ...x.currentAssignment, [selected]: (x.currentAssignment?.[selected] || []).slice(0, limit) }, lockedStudents: x.lockedStudents.filter((id) => !removed.includes(id)) };
@@ -347,14 +350,14 @@ function App() {
   }]].map(([icon, label, fn], i) => <Button key={label} icon={icon} className={i === 0 ? "tool active" : "tool"} disabled={!c || label === "Rotate" && !selected} onClick={fn}>{label}</Button>)}<div className="save-status" role="status"><i />{sync}{sync.startsWith("Save failed") && <button onClick={() => setUndoTick((x) => x + 1)}>Retry</button>}</div></section></aside>
  <main className="main-workspace"><h1 className="print-title">{c?.name}</h1><div className="workspace-heading no-print"><div><p className="eyebrow">YOUR CLASSROOM, THOUGHTFULLY ARRANGED</p><h2>{c?.name || "Welcome to your classroom"}</h2></div>{c && <div className="history-controls"><Button icon="undo" aria-label="Undo" disabled={!past.current.length} onClick={() => undo(false)} /><Button icon="redo" aria-label="Redo" disabled={!future.current.length} onClick={() => undo(true)} /><button onClick={() => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch((e) => setError(e.message))}>Present</button><button onClick={() => setModal("class")}>Class options</button></div>}</div>
  {!c ? <div className="empty-state"><span>🪑</span><h2>Make room for a great day.</h2><p>Create a class, add your students, and arrange your space.</p><Button icon="plus" className="primary" onClick={() => setModal("newClass")}>Create a class</Button></div> : <>
- {tab === "Seats" && <><div className="canvas-toolbar no-print"><span className="orientation">⌃ Front of Classroom</span><div className="segmented">{["room", "grid", "list"].map((v) => <Button key={v} icon={v === "grid" ? "seats" : v} className={view === v ? "active" : ""} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</Button>)}</div></div><div className="canvas-viewport" ref={viewport}><Chart c={c} prefs={prefs} view={view} zoom={zoom * fit} selected={selected} setSelected={setSelected} update={update} picked={picked} setPicked={setPicked} place={place} startStudentDrag={startStudentDrag} /></div><div className="canvas-footer no-print">{picked && <button onClick={() => {
+ {tab === "Seats" && <><div className="canvas-toolbar no-print"><button className="orientation" onClick={() => setModal("room")}>Room designer</button><div className="segmented">{["room", "grid", "list"].map((v) => <Button key={v} icon={v === "grid" ? "seats" : v} className={view === v ? "active" : ""} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</Button>)}</div></div><div className="canvas-viewport" ref={viewport}><Chart c={c} prefs={prefs} view={view} zoom={zoom * fit} selected={selected} setSelected={setSelected} update={update} picked={picked} setPicked={setPicked} place={place} startStudentDrag={startStudentDrag} /></div><div className="canvas-footer no-print">{picked && <button onClick={() => {
     if (c.lockedStudents.includes(picked)) {
       setError("Unlock the student in Settings first.");
       return;
     }
     update((x) => ({ ...x, currentAssignment: Object.fromEntries(Object.entries(x.currentAssignment || {}).map(([tid, ids]) => [tid, ids.map((id) => id === picked ? null : id)])) }));
     setPicked(null);
-  }}>Unassign selected</button>}<span>{picked ? "Choose a seat to move or swap this student." : "Drag tables to arrange \xB7 Select a student, then a seat to assign"}</span><div><button aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}>−</button><span>{Math.round(zoom * 100)}%</span><button aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(2, z + 0.1))}>+</button><button onClick={() => setZoom(1)}>Reset</button></div></div>{selected && <TableEditor table={c.tables.find((t) => t.id === selected)} change={changeTable} remove={async () => {
+  }}>Unassign selected</button>}<span>{picked ? "Choose a seat to move or swap this student." : "Drag tables to arrange \xB7 Select a student, then a seat to assign"}</span><div><button aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}>−</button><span>{Math.round(zoom * 100)}%</span><button aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(2, z + 0.1))}>+</button><button onClick={() => setZoom(1)}>Fit room</button></div></div>{selected && <TableEditor table={c.tables.find((t) => t.id === selected)} change={changeTable} remove={async () => {
     if (await confirmAction("Delete this table? Its students will become unassigned.")) {
       update((x) => {
         const a = { ...x.currentAssignment };
@@ -370,10 +373,10 @@ function App() {
   }} />}</>}
  {tab === "Students" && <section className="content-panel"><div className="panel-heading"><h2>Student management</h2><Button icon="plus" className="primary" onClick={() => setModal({ student: null })}>Add student</Button></div><div className="button-row"><button onClick={() => setModal("import")}>Import CSV</button><button onClick={() => setModal("sheets")}>Import Google Sheets</button><button onClick={() => download(c.name + "-roster.csv", S.csv([["First name", "Last name", "Preferred name"], ...c.students.map((s) => [s.firstName, s.lastName, s.preferredName])]))}>Export roster CSV</button></div><p className="muted">Notes are private to you. Gender is optional and never inferred.</p>{c.students.map((s) => <div className="student-management" key={s.id}><div><strong>{S.display(s, "full")}</strong><small>{S.locate(c.currentAssignment, s.id) ? "Assigned" : "Unassigned"}{c.lockedStudents.includes(s.id) ? " \xB7 Locked" : ""}</small></div><button onClick={() => setModal({ student: s })}>Edit</button></div>)}</section>}
  {tab === "History" && <section className="content-panel"><div className="panel-heading"><h2>Seating history</h2><button className="primary" onClick={() => setModal({ naming: "arrangement" })}>Save current arrangement</button></div>{!c.seatingHistory.length && <p className="muted">Saved arrangements and randomization history appear here.</p>}{c.seatingHistory.map((h) => <article className="history-row" key={h.id}><div><strong>{h.name || "Seating arrangement"}</strong><small>{new Date(h.date).toLocaleString()}</small></div><button onClick={async () => {
-    if (await confirmAction("Restore this arrangement? You can undo this change.")) update((x) => ({ ...x, currentAssignment: S.clone(h.assignment), tables: h.tables ? S.clone(h.tables) : x.tables, screen: h.screen || x.screen, furniture: h.furniture || x.furniture, lockedStudents: [] }));
+    if (await confirmAction("Restore this arrangement? You can undo this change.")) update((x) => ({ ...x, currentAssignment: S.clone(h.assignment), room: h.room || S.roomSize(x), tables: h.tables ? S.clone(h.tables) : x.tables, screen: h.screen || x.screen, furniture: h.furniture || x.furniture, lockedStudents: [] }));
   }}>Restore</button></article>)}</section>}
  {tab === "Templates" && <section className="content-panel"><div className="panel-heading"><h2>Layout templates</h2><button className="primary" onClick={() => setModal({ naming: "template" })}>Save this layout</button></div><p className="muted">Templates contain furniture and seats only. Student information is never copied.</p>{data.templates.map((t) => <article className="history-row" key={t.id}><div><strong>{t.name}</strong><small>{t.tables.length} tables</small></div><button onClick={async () => {
-    if (await confirmAction("Apply this layout and clear current assignments?")) update((x) => ({ ...x, tables: S.clone(t.tables), screen: S.clone(t.screen), furniture: S.clone(t.furniture), currentAssignment: {}, lockedStudents: [] }));
+    if (await confirmAction("Apply this layout and clear current assignments?")) update((x) => ({ ...x, room: t.room || {width:840,height:520}, tables: S.clone(t.tables), screen: S.clone(t.screen), furniture: S.clone(t.furniture), currentAssignment: {}, lockedStudents: [] }));
   }}>Apply</button><button onClick={async () => {
     if (await confirmAction("Delete this template?")) commit((d) => ({ ...d, templates: d.templates.filter((x) => x.id !== t.id) }));
   }}>Delete</button></article>)}</section>}
@@ -389,7 +392,7 @@ function App() {
     setDrawer("");
   }} aria-pressed={picked === s.id}><span className={S.locate(c.currentAssignment, s.id) ? "assigned-dot" : "unassigned-dot"} /><span>{S.display(s, "full")}</span><span className="drag-handle">{c.lockedStudents.includes(s.id) ? "\u{1F512}" : "\u283F"}</span></button>)}</div><button className="add-student" disabled={!c} onClick={() => setModal({ student: null })}>＋ Add Student</button></section><section className="panel display-options"><h2>Display Options</h2><label className="toggle-label"><span>Show gender colors</span><input type="checkbox" role="switch" checked={prefs.showGender} onChange={(e) => setPref("showGender", e.target.checked)} /></label><p>Optional. Off by default for a neutral view.</p><label>Name display<select value={prefs.nameStyle} onChange={(e) => setPref("nameStyle", e.target.value)}><option value="first">First names</option><option value="initial">First + last initial</option><option value="full">Full names</option></select></label></section></aside>
  </div>
- {modal && <Dialog title={typeof modal === "object" ? modal.naming ? "Choose a name" : "Student details" : { newClass: "Create a class", class: "Class options", random: "Preview seating arrangement", export: "Print & export", share: "Share a view-only chart", import: "Import students", sheets: "Import Google Sheets", help: "A little help" }[modal] || "Seating Chart"} onClose={() => {
+ {modal && <Dialog title={typeof modal === "object" ? modal.naming ? "Choose a name" : "Student details" : { room: "Room designer", newClass: "Create a class", class: "Class options", random: "Preview seating arrangement", export: "Print & export", share: "Share a view-only chart", import: "Import students", sheets: "Import Google Sheets", help: "A little help" }[modal] || "Seating Chart"} onClose={() => {
     setModal(null);
     setPreview(null);
   }}>
@@ -400,7 +403,7 @@ function App() {
     if (modal.naming === "arrangement") saveArrangement(c.currentAssignment || {}, name);
     else if (modal.naming === "rename") update((x) => ({ ...x, name }));
     else if (modal.naming === "category") setPref("genderLabels", { ...prefs.genderLabels || { F: "Female", M: "Male", NB: "Nonbinary", X: "Other / self-described" }, ["custom_" + S.id()]: name });
-    else commit((d) => ({ ...d, templates: [...d.templates, { id: S.id(), name, tables: S.clone(c.tables), screen: S.clone(c.screen), furniture: S.clone(c.furniture) }] }));
+    else commit((d) => ({ ...d, templates: [...d.templates, { id: S.id(), name, room: S.roomSize(c), tables: S.clone(c.tables), screen: S.clone(c.screen), furniture: S.clone(c.furniture) }] }));
     setModal(null);
   }}><label>Name<input name="name" required autoFocus defaultValue={modal.naming === "rename" ? c.name : ""} /></label><button className="primary">Save name</button></form>}
  {modal === "newClass" && <form onSubmit={(e) => {
@@ -426,7 +429,7 @@ function App() {
     commit((d) => ({ ...d, classes: [...d.classes, nc], activeClassId: nc.id }));
     setModal(null);
   }}>Duplicate class with roster</button><button onClick={() => {
-    const nc = { ...S.makeClass(c.name + " layout"), tables: S.clone(c.tables), screen: S.clone(c.screen), furniture: S.clone(c.furniture) };
+    const nc = { ...S.makeClass(c.name + " layout"), room: S.roomSize(c), tables: S.clone(c.tables), screen: S.clone(c.screen), furniture: S.clone(c.furniture) };
     commit((d) => ({ ...d, classes: [...d.classes, nc], activeClassId: nc.id }));
     setModal(null);
   }}>Duplicate layout only</button><button onClick={() => {
@@ -455,6 +458,7 @@ function App() {
     setModal(null);
   }} />}
  {modal === "share" && <SharePanel c={c} user={user} demo={demo} includeGender={outputGender} setIncludeGender={setOutputGender} />}
+ {modal === "room" && <RoomDesigner c={c} update={update} onApplied={() => {setSelected(null);setZoom(1);setModal(null);}} />}
  {modal === "help" && <div className="help-text"><p>Select a student in the roster, then select a seat. Selecting an occupied seat swaps students. This works with a mouse, touch, or keyboard.</p><p>Drag a table by its header. Select a table and use arrow keys to move it. Use the table controls to rotate, duplicate or delete.</p><p>Use the zoom buttons and scroll the workspace to pan. Undo with ⌘Z or Ctrl+Z; redo with Shift.</p><p>Randomize shows a preview. History preserves saved arrangements. Templates copy only the layout.</p><p>Gender colors start off. Notes stay private. Sharing requires verified Faculty access and expires after seven days.</p>{demo && <p><strong>This demo uses fictional data and does not save changes.</strong></p>}</div>}
  </Dialog>}
  </div>;
@@ -466,15 +470,9 @@ function Chart({ c, prefs, view = "room", zoom = 1, selected, setSelected = () =
 }, readOnly = false }) {
   const drag = useRef(null);
   const a = c.currentAssignment || {};
-  const dim = (t) => {
-    if (c.tableSize) {
-      const sizes = { sm: [50, 100], md: [70, 140], lg: [90, 180] };
-      const [w, h] = sizes[c.tableSize] || sizes.sm;
-      return t.orientation === "H" ? [h, w] : [w, h];
-    }
-    return t.seats === 1 ? [110, 90] : t.orientation === "H" ? [190, 114] : [114, 190];
-  };
-  const move = (t, x, y) => update((c2) => ({ ...c2, tables: c2.tables.map((q) => q.id === t.id ? { ...q, x: Math.max(0, Math.min(800 - dim(t)[0], x)), y: Math.max(38, Math.min(490 - dim(t)[1], y)) } : q) }));
+  const room = S.roomSize(c);
+  const dim = (t) => S.tableDimensions(c,t);
+  const move = (t, x, y) => update(c2 => ({...c2,tables:c2.tables.map(q=>q.id===t.id ? S.boundTable(c2,q,x,y):q)}));
   const start = (e, t) => {
     if (readOnly) return;
     setSelected(t.id);
@@ -484,6 +482,7 @@ function Chart({ c, prefs, view = "room", zoom = 1, selected, setSelected = () =
   const end = (e) => {
     const d = drag.current;
     if (!d) return;
+    if (Math.abs(e.clientX-d.x)+Math.abs(e.clientY-d.y)<2) {drag.current=null;return;}
     move(d.t, Math.round(d.ox + (e.clientX - d.x) / zoom), Math.round(d.oy + (e.clientY - d.y) / zoom));
     drag.current = null;
   };
@@ -504,11 +503,11 @@ function Chart({ c, prefs, view = "room", zoom = 1, selected, setSelected = () =
     }} onClick={() => !readOnly && place(t.id, i)}><span>{s ? S.display(s, prefs.nameStyle) : "\uFF0B"}</span>{locked && <small>Locked</small>}</button>;
   };
   if (view === "list") return <div className="list-view"><table><thead><tr><th>Table</th><th>Seat</th><th>Student</th><th className="no-print">Assignment</th></tr></thead><tbody>{c.tables.flatMap((t) => Array.from({ length: t.seats }, (_, i) => <tr key={t.id + i}><td>{t.label}</td><td>{i + 1}</td><td>{S.display(c.students.find((s) => s.id === a[t.id]?.[i]), prefs.nameStyle)}</td><td className="no-print">{!readOnly && <button onClick={() => place(t.id, i)}>{picked ? "Place selected student" : "Select student"}</button>}</td></tr>))}</tbody></table></div>;
-  return <div className={view === "room" ? "room-scroll" : "grid-scroll"} style={view === "room" ? { width: 840 * zoom, height: 520 * zoom } : void 0}><div className={view === "room" ? "room-surface" : "grid-surface"} style={view === "room" ? { transform: `scale(${zoom})`, transformOrigin: "top left" } : void 0}>
- {view === "room" && <><div className="whiteboard" style={{ left: c.screen?.x || 300, top: c.screen?.y || 8, transform: c.screen?.orientation === "V" ? "rotate(90deg)" : "none" }}>FRONT OF CLASSROOM</div><div className="room-plant plant-left" aria-hidden="true">🪴</div><div className="room-plant plant-right" aria-hidden="true">🪴</div>{(c.furniture || []).map((f) => <div key={f.id} className="furniture" style={{ left: f.x, top: f.y }}>{{ plant: "\u{1FAB4}", clock: "\u25F7", door: "\u{1F6AA}", window: "\u{1FA9F}", sink: "\u{1F6B0}", teacherDesk: "Teacher\u2019s desk" }[f.type] || "Furniture"}</div>)}</>}
+  return <div className={view === "room" ? "room-scroll" : "grid-scroll"} style={view === "room" ? { width: room.width * zoom, height: room.height * zoom } : void 0}><div className={view === "room" ? "room-surface" : "grid-surface"} style={view === "room" ? { width: room.width, height: room.height, transform: `scale(${zoom})`, transformOrigin: "top left" } : void 0}>
+ {view === "room" && <><div className="whiteboard" style={{ left: c.screen?.x ?? 300, top: c.screen?.y ?? 8, width: c.screen?.orientation === "V" ? 30 : 200, height: c.screen?.orientation === "V" ? 200 : 30, writingMode: c.screen?.orientation === "V" ? "vertical-rl" : "horizontal-tb" }}>{c.screen?.label || "FRONT OF CLASSROOM"}</div><div className="room-plant plant-left" aria-hidden="true">🪴</div><div className="room-plant plant-right" aria-hidden="true">🪴</div>{(c.furniture || []).map((f) => <div key={f.id} className="furniture" style={{ left: f.x, top: f.y, width:f.width, height:f.height, background:f.type === "note" ? "#fff9cf" : undefined }}>{{ plant: "\u{1FAB4}", clock: "\u25F7", door: "\u{1F6AA}", window: "\u{1FA9F}", sink: "\u{1F6B0}", teacherDesk: "Teacher\u2019s desk" }[f.type] || f.label || f.type}</div>)}</>}
  {c.tables.map((t) => {
     const [w, h] = dim(t);
-    return <article key={t.id} className={"classroom-table " + (selected === t.id ? "selected" : "")} style={view === "room" ? { left: t.x, top: t.y, width: w, height: h } : void 0}><button className="table-handle" aria-label={`Move ${t.label}`} disabled={readOnly} onPointerDown={view === "room" ? (e) => start(e, t) : void 0} onPointerMove={(e) => {
+    return <article key={t.id} className={"classroom-table shape-" + (t.shape || "rectangle") + " " + (selected === t.id ? "selected" : "")} style={view === "room" ? { left: t.x, top: t.y, width: w, height: h } : void 0}><button className="table-handle" aria-label={`Move ${t.label}`} disabled={readOnly} onPointerDown={view === "room" ? (e) => start(e, t) : void 0} onPointerMove={(e) => {
       const d = drag.current;
       if (d && d.t.id === t.id) {
         d.el.style.left = d.ox + (e.clientX - d.x) / zoom + "px";
@@ -534,7 +533,7 @@ function Chart({ c, prefs, view = "room", zoom = 1, selected, setSelected = () =
 }
 function TableEditor({ table: t, change, remove, duplicate }) {
   if (!t) return null;
-  return <div className="table-editor no-print"><label>Table name<input aria-label="Table name" value={t.label} onChange={(e) => change((t2) => ({ ...t2, label: e.target.value }))} /></label><label>Seats<select aria-label="Table seats" value={t.seats} onChange={async (e) => {
+  return <div className="table-editor no-print"><label>Table name<input aria-label="Table name" value={t.label} onChange={(e) => change((t2) => ({ ...t2, label: e.target.value }))} /></label><label>Shape<select aria-label="Table shape" value={t.shape || "rectangle"} onChange={e=>change(q=>({...q,shape:e.target.value}))}>{["rectangle","round","oval"].map(v=><option key={v}>{v}</option>)}</select></label><label>Width<input aria-label="Table width" type="number" min="100" max="400" value={t.width || 190} onChange={e=>change(q=>({...q,width:Math.max(100,Math.min(400,+e.target.value))}))}/></label><label>Depth<input aria-label="Table depth" type="number" min="90" max="300" value={t.height || 114} onChange={e=>change(q=>({...q,height:Math.max(90,Math.min(300,+e.target.value))}))}/></label><label>Seats<select aria-label="Table seats" value={t.seats} onChange={async (e) => {
     const n = +e.target.value;
     if (n < t.seats && !await confirmAction("Reduce seats? Students in removed seats will become unassigned. You can undo this change.")) return;
     change((t2) => ({ ...t2, seats: n }));
@@ -631,3 +630,11 @@ function SharePanel({ c, user, demo, includeGender, setIncludeGender }) {
   }}>Revoke</button></div>)}</div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+function RoomDesigner({c,update,onApplied}) {
+  const room=S.roomSize(c);
+  const [width,setWidth]=useState(room.width),[height,setHeight]=useState(room.height);
+  const [kind,setKind]=useState('lab'),[object,setObject]=useState('note'),[label,setLabel]=useState('');
+  const screen=(side)=>update(x=>{const r=S.roomSize(x);return {...x,screen:{label:'SCREEN',orientation:['left','right'].includes(side)?'V':'H',x:side==='right'?r.width-65:side==='left'?25:(r.width-200)/2,y:side==='bottom'?r.height-55:side==='top'?20:(r.height-200)/2}};});
+  return <div className="dialog-stack"><p>Arrange your space, then drag tables by their headers. All changes support Undo.</p><h3>Classroom layouts</h3><label>Layout preset<select value={kind} onChange={e=>setKind(e.target.value)}><option value="lab">Creativity Lab · six tables · screen right</option><option value="pods">Round table pods</option><option value="rows">Desk rows · 24 seats</option><option value="horseshoe">Horseshoe · open toward screen</option></select></label><button onClick={async()=>{if(await confirmAction('Replace the layout and clear seat assignments? Students remain in your roster. You can Undo this change.')){update(x=>({...x,...S.layoutPreset(kind),tableSize:null,currentAssignment:{},lockedStudents:[]}));onApplied();}}}>Apply layout</button><h3>Room size</h3><p className="muted">Canvas units describe proportions, not measured feet or metres.</p><div className="form-columns"><label>Room width<input type="number" min="600" max="2000" value={width} onChange={e=>setWidth(e.target.value)}/></label><label>Room depth<input type="number" min="400" max="1200" value={height} onChange={e=>setHeight(e.target.value)}/></label></div><button onClick={()=>update(x=>{const next={...x,room:{...x.room,width:Math.max(600,Math.min(2000,+width||1100)),height:Math.max(400,Math.min(1200,+height||600))}};return {...next,tables:next.tables.map(t=>S.boundTable(next,t)),screen:{...next.screen,x:Math.min(next.screen.x,next.room.width-200),y:Math.min(next.screen.y,next.room.height-200)},furniture:next.furniture.map(f=>({...f,x:Math.min(f.x,next.room.width-(f.width||80)),y:Math.min(f.y,next.room.height-(f.height||50))}))};})}>Resize room</button><label><input type="checkbox" checked={!!c.room?.snap} onChange={e=>update(x=>({...x,room:{...S.roomSize(x),snap:e.target.checked}}))}/> Snap table movements to a 10-unit grid</label><h3>Screen position</h3><div className="button-row">{['left','right','top','bottom'].map(side=><button key={side} onClick={()=>screen(side)}>Screen {side}</button>)}</div><h3>Room objects</h3><div className="form-columns"><label>Object<select value={object} onChange={e=>setObject(e.target.value)}>{['note','teacherDesk','door','window','plant','sink','stage','storage'].map(v=><option key={v}>{v}</option>)}</select></label><label>Object label<input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Optional label"/></label></div><button onClick={()=>update(x=>({...x,furniture:[...x.furniture,{id:S.id(),type:object,label:label||object,x:30,y:30,width:object==='stage'?200:100,height:object==='stage'?100:50}]}))}>Add room object</button>{c.furniture.map(f=><div className="object-editor" key={f.id}><strong>{f.label||f.type}</strong>{['x','y','width','height'].map(k=><label key={k}>{k}<input aria-label={`${f.label||f.type} ${k}`} type="number" min="0" max={k==='x'||k==='width'?room.width:room.height} value={f[k]??(k==='width'?100:50)} onChange={e=>{const value=+e.target.value;update(x=>({...x,furniture:x.furniture.map(q=>q.id===f.id?{...q,[k]:Math.max(0,Math.min(k==='x'||k==='width'?room.width:room.height,value))}:q)}));}}/></label>)}<button onClick={()=>update(x=>({...x,furniture:x.furniture.filter(q=>q.id!==f.id)}))}>Remove object</button></div>)}</div>;
+}
