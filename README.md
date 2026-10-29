@@ -21,9 +21,9 @@ The editor supports room/grid/list views, roster-to-seat assignment and swaps, k
 - `styles.css`: responsive layout, warm classroom, focus states and print rules.
 - `sheets.js`: retained school roster integration; data is not cached in shared browser storage.
 - `firestore.rules`: per-teacher isolation, expiring Faculty grants and restricted sharing.
-- `admin/`: privileged Workspace Directory verifier, never invoked by the browser.
+- `admin/`: privileged administrator allowlist verifier, never invoked by the browser.
 
-Read [ADMIN_SETUP.md](ADMIN_SETUP.md) before deploying. **Deployment is blocked until the exact Faculty OU, delegated Directory access, restrictive rules and authorization tests are validated.** Do not use the old public sharing rules.
+Read [ADMIN_SETUP.md](ADMIN_SETUP.md) before deploying. **Deployment is blocked until the approved Faculty allowlist, Firebase grant provisioning, restrictive rules and authorization tests are validated.** Do not use the old public sharing rules.
 
 ## Verification
 

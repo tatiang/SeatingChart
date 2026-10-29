@@ -133,7 +133,7 @@ function App() {
         if (!u.emailVerified || !u.email?.toLowerCase().endsWith("@markdayschool.org") || token.signInProvider !== "google.com") throw Error("Use your verified Mark Day School Google account.");
         const ref = fbDb.collection("facultyAccess").doc(u.uid);
         const access = await ref.get({ source: "server" });
-        if (!access.exists || access.data().email !== u.email || access.data().expiresAt.toMillis() <= Date.now()) throw Error("Faculty authorization is missing or expired. A Workspace administrator must verify your Faculty organizational unit.");
+        if (!access.exists || access.data().email !== u.email || access.data().expiresAt.toMillis() <= Date.now()) throw Error("Faculty authorization is missing or expired. An administrator must approve your school account on the Faculty allowlist.");
         const snap = await fbDb.collection("users").doc(u.uid).get({ source: "server" });
         if (epoch !== session.current) return;
         const next = snap.exists ? S.migrate(snap.data().d) : S.migrate({ classes: [], activeClassId: null });

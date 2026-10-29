@@ -6,3 +6,4 @@ admin/node_modules/
 service-account*.json
 *-debug.log
 .firebase/
+faculty-allowlist*.json

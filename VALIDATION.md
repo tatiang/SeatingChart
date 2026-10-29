@@ -4,7 +4,7 @@ All application and emulator fixtures use synthetic students and identities.
 
 ## Commands
 
-- `npm run check` — PASS (10 tests and production browser bundle).
+- `npm run check` — PASS (11 tests and production browser bundle).
 - `node --check admin/sync-faculty.mjs` — PASS.
 - `node --check sheets.js` — PASS.
 - `git diff --check` — PASS.
@@ -30,7 +30,7 @@ At `http://localhost:4173/?demo=1`:
 
 ## Rollout-only checks still required
 
-- Real Faculty OU membership, real Directory delegated permissions, and administrator job reliability.
+- Real Faculty approval, real Firebase administrator permissions, and administrator job reliability.
 - Live Google authentication, authorized cloud save/reload, and unauthorized reads against the deployed rules.
 - Actual iPad touch hardware, printer/PDF output and Google Sheets OAuth with school test accounts.
 - Current production Firestore rules inspection and backup, legacy note migration, both pull requests, deployment and live portfolio link verification.

@@ -1,3 +1,8 @@
+Oct 29, 2026 — 4:40 PM PT — HEAD — Approved Faculty accounts without organizational-unit checks
+- Replaced the Directory integration with individual, expiring administrator-approved Faculty accounts.
+- Removed the Google APIs dependency; school domain alone still cannot grant access.
+- Added allowlist validation and policy tests. Production grants are not changed by this commit.
+
 Oct 29, 2026 — 4:35 PM PT — HEAD — Redesigned classroom seating with private Faculty access
 - Added a warm responsive room editor, student assignment and swaps, table controls, undo/redo, CSV and Sheets import, history and layout templates.
 - Preserved legacy data fields and IDs; gender display defaults off, and notes are excluded from shared charts and exports.

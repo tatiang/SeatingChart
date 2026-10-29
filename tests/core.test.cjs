@@ -9,4 +9,18 @@ test('shared snapshots omit private notes and gender unless explicitly enabled',
 test('CSV supports quoting, newlines, optional gender and formula-safe exports',()=>{const rows=S.importCSV('First name,Last name,Preferred name\r\nAlex,"Rivera, Jr.","A\nR"');assert.equal(rows[0].lastName,'Rivera, Jr.');assert.equal(rows[0].gender,'');assert.equal(rows[0].preferredName,'A\nR');assert.equal(S.csv([['=SUM(A1:A3)','a"b']]),'"\'=SUM(A1:A3)","a""b"');assert.throws(()=>S.parseCSV('"unclosed'),/unclosed/);});
 test('invalid remote data fails closed',()=>assert.throws(()=>S.migrate({classes:'bad'}),/Unrecognized/));
 test('legacy over-capacity assignments remain visible after migration',()=>{const c=fixture(6);c.currentAssignment={[c.tables[0].id]:c.students.map(s=>s.id)};const d=S.migrate({classes:[c]});assert.equal(d.classes[0].tables[0].seats,6);assert.deepEqual(d.classes[0].currentAssignment,c.currentAssignment);});
-test('Workspace policy requires exact Faculty OU and active verified Google identity',async()=>{const {eligibleFaculty}=await import('../admin/policy.mjs');const identity={email:'faculty@markdayschool.org',emailVerified:true,disabled:false,providerData:[{providerId:'google.com'}]};const user={primaryEmail:identity.email,orgUnitPath:'/Faculty',suspended:false,archived:false};assert.equal(eligibleFaculty(identity,user,'/Faculty'),true);for(const other of [{...user,orgUnitPath:'/Students'},{...user,orgUnitPath:'/Staff'},{...user,orgUnitPath:'/Faculty/Guests'},{...user,suspended:true},{...user,archived:true},{...user,primaryEmail:'someoneelse@markdayschool.org'}])assert.equal(eligibleFaculty(identity,other,'/Faculty'),false);assert.equal(eligibleFaculty({...identity,disabled:true},user,'/Faculty'),false);assert.equal(eligibleFaculty({...identity,emailVerified:false},user,'/Faculty'),false);assert.equal(eligibleFaculty({...identity,providerData:[{providerId:'password'}]},user,'/Faculty'),false);});
+test('manual Faculty policy requires an explicit active approval and verified Google identity',async()=>{
+ const {eligibleFaculty,parseAllowlist}=await import('../admin/policy.mjs');
+ const now=Date.parse('2026-10-29T00:00:00Z');
+ const approvals=parseAllowlist([{email:'faculty@markdayschool.org',approvedUntil:'2026-10-30T00:00:00Z'}],now);
+ const identity={email:'faculty@markdayschool.org',emailVerified:true,disabled:false,providerData:[{providerId:'google.com'}]};
+ assert.equal(eligibleFaculty(identity,approvals,now),true);
+ for(const other of [{...identity,email:'student@markdayschool.org'},{...identity,email:'staff@markdayschool.org'},{...identity,email:'external@gmail.com'},{...identity,disabled:true},{...identity,emailVerified:false},{...identity,providerData:[{providerId:'password'}]}])assert.equal(eligibleFaculty(other,approvals,now),false);
+ assert.equal(eligibleFaculty(identity,approvals,now+2*86400000),false);
+ assert.equal(eligibleFaculty(identity,new Map(),now),false);
+});
+test('allowlist rejects wildcards, external accounts, duplicates and unbounded approvals',async()=>{
+ const {parseAllowlist}=await import('../admin/policy.mjs'); const now=Date.parse('2026-10-29T00:00:00Z');
+ for(const value of [{},[{email:'*@markdayschool.org',approvedUntil:'2026-10-30T00:00:00Z'}],[{email:'person@gmail.com',approvedUntil:'2026-10-30T00:00:00Z'}],[{email:'faculty@markdayschool.org',approvedUntil:'2027-10-30T00:00:00Z'}],[{email:'faculty@markdayschool.org',approvedUntil:'invalid'}]])assert.throws(()=>parseAllowlist(value,now));
+ const entry={email:'faculty@markdayschool.org',approvedUntil:'2026-10-30T00:00:00Z'};assert.throws(()=>parseAllowlist([entry,entry],now),/Duplicate/);
+});
