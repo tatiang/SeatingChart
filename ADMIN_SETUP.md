@@ -1,0 +1,23 @@
+# Faculty authorization and deployment gate
+
+Do not deploy v2 or these rules until the checks below are complete. The production rules currently deployed have not been inspected. The old README recommended public shared-class reads; that recommendation is removed. No production records or rules were changed during implementation.
+
+## Administrator actions
+
+1. Export/backup Firestore in `seatingchart-a4cae`; retain the currently deployed rules for rollback review. Inventory `users`, `sharedClasses`, and `schoolNotes`. Existing user documents are retained at `users/{uid}.d`. Never restore publicly readable rules as an automatic rollback.
+2. Confirm the **exact** Workspace Faculty organizational-unit path (for example `/Faculty`, but do not assume it). The verifier checks exact membership; child OUs require an explicit policy change. Confirm suspended and archived users are denied.
+3. Approve a dedicated service account for domain-wide delegation with only `https://www.googleapis.com/auth/admin.directory.user.readonly`. Delegate to an administrator with read access to Directory users. Grant the runtime service account read-only Firebase Authentication access and Firestore access sufficient to manage `facultyAccess` documents. Firestore Admin SDK bypasses rules, so restrict credential access to the administrative runtime. Do not put credentials in this repository, browser assets, GitHub Pages, or client configuration.
+4. Install the administrator utility's dependencies with `npm ci --prefix admin`. Configure `GOOGLE_APPLICATION_CREDENTIALS` to an external credential file, `WORKSPACE_ADMIN_EMAIL`, `FACULTY_OU_PATH`, and `FIREBASE_PROJECT_ID=seatingchart-a4cae`. Review `node admin/sync-faculty.mjs` dry-run counts before running `node admin/sync-faculty.mjs --apply`.
+5. Arrange an approved recurring administrative job every 15 minutes. Grants expire after one hour, so failed verification fails closed. Offboarding is enforced at the next successful sync (normally within 15 minutes), at expiration within one hour, or immediately by deleting the user's grant. A new teacher must sign in once to create their Firebase Auth identity, then wait for verification and retry. Scheduling infrastructure and any associated cost require separate approval.
+6. Install root dev dependencies, run `npm run check` and `npm run test:rules` with Java 21+ available. All emulator tests must pass. Validate real Faculty, student, non-Faculty staff and external test accounts without using real student records.
+7. Coordinate cutover: new rules intentionally deny legacy `sharedClasses` and `schoolNotes` paths. Existing data is not deleted. Teachers must migrate private notes through an administrator-reviewed process; school-wide notes are not automatically copied into private accounts. Old public import links stop working under the new rules. New links are faculty-only, owner-revocable, read-only and expire within seven days.
+8. After explicit security push approval and PR review, deploy rules with `firebase deploy --only firestore:rules --project seatingchart-a4cae`, publish the validated static application on the existing GitHub Pages site, and test both unauthorized reads and authorized save/load. Publish the portfolio card only after authorization is proven live.
+
+## Data and operational limits
+
+- Migration is additive and in memory until a teacher edits; unknown fields, IDs, notes and old history remain. The app refuses to save after a failed initial cloud load. No unscoped browser cache is imported into a teacher account.
+- Existing one-document-per-teacher storage remains subject to Firestore's 1 MiB limit. A failed save leaves the page marked unsaved; keep it open and retry. Coordinate multi-device edits: this release retains the legacy last-writer-wins storage model, so simultaneous edits can overwrite each other.
+- The app does not cache student records in localStorage. In-memory demo mode uses fictional records and cannot access cloud data. A teacher's legacy local storage is left untouched for deliberate recovery.
+- Private notes are stored within the teacher's document; public screenshots/tests use synthetic data. No analytics or AI service receives student records. React and Firebase scripts retain the existing external CDN loading pattern.
+- Rules protect stored information even if a malicious client bypasses the UI. No frontend-only domain check grants access. `facultyAccess` is writable only through the privileged verifier.
+- This checkout contains no administrator secrets. Firebase web configuration identifies the existing project and is not an authorization credential.

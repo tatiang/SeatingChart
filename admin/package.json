@@ -1,0 +1,1 @@
+{"name":"seating-faculty-access-admin","private":true,"type":"module","scripts":{"verify":"node sync-faculty.mjs"},"dependencies":{"firebase-admin":"^14.5.0","googleapis":"^188.0.0"}}

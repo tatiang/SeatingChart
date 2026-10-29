@@ -1,151 +1,32 @@
-# Seating Chart Builder
+# Seating Chart Builder v2.00
 
-A classroom seating chart tool with Google login and cloud sync — works from any browser.
+A warm, responsive classroom seating editor for verified Mark Day School Faculty.
 
----
+## Local development
 
-## One-time setup (~15 minutes)
-
-### Step 1 — Install tools (on your Mac, in Terminal)
-
-```bash
-npm install -g firebase-tools
+```sh
+npm ci
+npm run check
+python3 -m http.server 4173
 ```
 
-### Step 2 — Create a Firebase project
+Open `http://localhost:4173/?demo=1` for fictional, in-memory data. Normal mode requires verified Google sign-in and an unexpired server-provisioned Faculty grant. The demo never loads cloud student data.
 
-1. Go to **https://console.firebase.google.com**
-2. Click **Add project** → name it `seating-chart` → Continue → Create project
-3. In the left sidebar click **Authentication** → **Get started**
-4. Under **Sign-in method**, enable **Google** → save
-5. In the left sidebar click **Firestore Database** → **Create database**
-   - Choose **Production mode** → select a region (us-central1 is fine) → Enable
-6. In Firestore, click the **Rules** tab → replace all the text with:
+The editor supports room/grid/list views, roster-to-seat assignment and swaps, keyboard/touch alternatives, table movement/rotation/duplication, undo/redo, CSV and school Google Sheets import, constraints, randomized previews, history, layout templates, archive/restore, neutral gender defaults and private notes. Use the Help button for interaction instructions.
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+## Architecture
 
-    // Each teacher's private data (classes, students, seating history)
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
-    }
+- `core.js`: additive migration, seating operations, randomized constraints, CSV and sanitized snapshots.
+- `app.jsx` → `app.js`: React editor and Firebase integration. Build before committing.
+- `styles.css`: responsive layout, warm classroom, focus states and print rules.
+- `sheets.js`: retained school roster integration; data is not cached in shared browser storage.
+- `firestore.rules`: per-teacher isolation, expiring Faculty grants and restricted sharing.
+- `admin/`: privileged Workspace Directory verifier, never invoked by the browser.
 
-    // Shared class snapshots — any signed-in user can read; only signed-in users can write
-    match /sharedClasses/{code} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
+Read [ADMIN_SETUP.md](ADMIN_SETUP.md) before deploying. **Deployment is blocked until the exact Faculty OU, delegated Directory access, restrictive rules and authorization tests are validated.** Do not use the old public sharing rules.
 
-    // School-wide student notes — any signed-in user can read and write
-    match /schoolNotes/{domain}/students/{student} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
-   Click **Publish**.
+## Verification
 
-> **Note:** If you previously set up Firestore with the v1 rules (users only), you must update the rules to enable the **Share** button and the **📝 Notes** tab. Just replace the entire rules block with the version above and click Publish.
+`npm test` exercises synthetic model data. `npm run build` compiles the browser bundle. `npm run test:rules` tests the Firestore rules in a local emulator and needs Java 21+. No production data is touched.
 
-### Step 3 — Get your Firebase config
-
-1. In Firebase Console, click the ⚙️ gear → **Project settings**
-2. Scroll to **Your apps** → click **</>** (Add web app)
-3. Name it `seating-chart-web` → Register app
-4. Copy the `firebaseConfig` object — you'll need these 6 values:
-   - `apiKey`
-   - `authDomain`
-   - `projectId`
-   - `storageBucket`
-   - `messagingSenderId`
-   - `appId`
-
-### Step 4 — Paste the config into index.html
-
-Open `index.html` in a text editor and find this block near the top:
-
-```js
-window.FB_CONFIG = {
-  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
-  authDomain:        "REPLACE_WITH_YOUR_PROJECT_ID.firebaseapp.com",
-  ...
-};
-```
-
-Replace each `REPLACE_WITH_...` value with the corresponding value from Step 3.
-
-### Step 5 — Add your domain to Firebase authorized domains
-
-1. In Firebase Console → Authentication → **Settings** tab
-2. Under **Authorized domains**, click **Add domain**
-3. Add `your-github-username.github.io` (e.g. `tgreenleaf.github.io`)
-
----
-
-## Deploy to GitHub Pages
-
-### First deploy
-
-```bash
-cd ~/GitHubProjects/SeatingChart
-
-# Initialize git
-git init
-git add .
-git commit -m "Initial commit"
-
-# Create a GitHub repo (authenticate first if needed: gh auth login)
-gh repo create SeatingChart --public --source=. --push
-
-# Enable GitHub Pages from the main branch
-gh api repos/{owner}/SeatingChart/pages \
-  --method POST \
-  --field source='{"branch":"main","path":"/"}' \
-  2>/dev/null || true
-```
-
-Your app will be live at:
-`https://YOUR-GITHUB-USERNAME.github.io/SeatingChart/`
-
-(GitHub Pages usually takes 1–2 minutes after the first push.)
-
-### Updating after changes
-
-```bash
-cd ~/GitHubProjects/SeatingChart
-git add index.html
-git commit -m "Update app"
-git push
-```
-
-GitHub Pages redeploys automatically on every push to `main`.
-
----
-
-## How the sync works
-
-| Situation | What happens |
-|-----------|-------------|
-| Signed in | All changes save to Firebase Firestore within ~1 second |
-| Open on another browser | Sign in with the same Google account → your data loads automatically |
-| No internet | The app still works; changes save locally and sync next time |
-| Not signed in | Data saves to the browser's localStorage (same as before) |
-
-The sync status dot in the bottom-left of the sidebar shows: 🟢 Saved · 🟡 Saving… · 🔴 Error
-
----
-
-## Firestore data structure
-
-```
-users/
-  {uid}/
-    d: { classes: [...], activeClassId: "..." }   ← entire app state
-    savedAt: timestamp
-```
-
-One document per user. Maximum Firestore document size is 1 MB — well above what any
-realistic number of classes would use.
+For UI checks, use demo mode: select a roster student then a seat; drag a table; use Undo/Redo; preview and apply Randomize; open Grid and List; create a student and class; save and restore history/templates; check iPad and mobile drawers. Confirm gender colors are off initially, notes never appear on outputs, and demo sharing is disabled.
