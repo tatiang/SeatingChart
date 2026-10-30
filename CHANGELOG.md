@@ -1,3 +1,8 @@
+Oct 30, 2026 — 8:22 AM PT — HEAD — Prepared the verified owner-only production release
+- Deployed owner-only Firestore rules after model/build and authorization tests passed.
+- Retained previous rules locally; existing student records were not changed.
+- Publishing the interface through the existing GitHub Pages main branch.
+
 Oct 29, 2026 — 5:04 PM PT — HEAD — Restricted the site to the owner’s Google account
 - Enforced verified Google sign-in for tgreenleaf@markdayschool.org in the app and database rules.
 - Removed the active Faculty grant requirement; other accounts cannot open shared charts.

@@ -48,3 +48,6 @@ These checks were deliberately not represented as completed.
 
 ## Owner-only rollout
 `npm run check`: PASS, 14 tests/build. Same Java 21 emulator command above: PASS for exact verified Google owner, rejected other school accounts (including existing Faculty grants), anonymous/external identities, wrong providers and cross-user data access. Firebase apps lookup failed: "Failed to list Firebase apps. See firebase-debug.log for more info." The connected account’s project listing does not include seatingchart-a4cae. No production deployment attempted.
+
+## Production deployment — October 30, 2026
+Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Production command `npx firebase deploy --only firestore:rules --project seatingchart-a4cae --account tgreenleaf@markdayschool.org --non-interactive`: PASS, rules released to cloud.firestore. Previous rules backed up outside repository.

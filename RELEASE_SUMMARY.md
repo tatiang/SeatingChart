@@ -25,3 +25,6 @@ SeatPlan reference parity is partial: AI floor-plan import, 3D, meals, live coll
 
 ## Owner-only rollout supersedes Faculty access
 The active app and rules now require tgreenleaf@markdayschool.org with verified Google authentication. Legacy Faculty grants do not authorize other users. No OU or renewal job is needed. Production rollout is blocked by Firebase project access; Pages remains unchanged.
+
+## Production release — October 30, 2026
+Firebase access resolved using the school account. Owner-only Firestore rules deployed successfully; existing records untouched. Publishing this release at https://tatiang.github.io/SeatingChart/ via main.
