@@ -84,12 +84,19 @@
       });
       if (Object.values(a).some((ids) => ids.some((sid) => sid && conflict(ids, sid)))) throw Error("Locked students conflict with a keep-apart restriction.");
       let failed = false;
+      const balance = showGender && (c.constraints?.genderMode || "mixed") === "mixed";
+      if (balance) {
+        const size = {};
+        pending.forEach((s) => { if (s.gender) size[s.gender] = (size[s.gender] || 0) + 1; });
+        pending.sort((x, y) => (x.gender ? 0 : 1) - (y.gender ? 0 : 1) || (size[y.gender] || 0) - (size[x.gender] || 0) || (x.gender < y.gender ? -1 : x.gender > y.gender ? 1 : 0));
+      }
       for (const s of pending) {
         let ts = c.tables.filter((t2) => a[t2.id].includes(null) && !conflict(a[t2.id], s.id));
         ts.sort((x, y) => {
           const score = (t2) => {
             const occupants = a[t2.id].filter(Boolean);
             let v = occupants.length / t2.seats;
+            if (balance) v = v * 1000 + (s.gender ? occupants.filter((sid) => c.students.find((q) => q.id === sid)?.gender === s.gender).length : 0);
             if (showGender && c.constraints?.genderMode === "together" && s.gender) v += occupants.filter((sid) => c.students.find((q) => q.id === sid)?.gender !== s.gender).length * 10;
             return v;
           };
@@ -122,6 +129,25 @@
       }
     }
     throw Error("Could not satisfy all seating restrictions. Review keep-apart pairs or add tables.");
+  }
+  const MAX_SEATS = 8;
+  function shortage(c) {
+    const excluded = new Set(c.constraints?.excludedStudents || []);
+    return Math.max(0, c.students.filter((s) => !excluded.has(s.id)).length - c.tables.reduce((n, t) => n + t.seats, 0));
+  }
+  function addSeats(c, extra) {
+    const tables = c.tables.map((t) => ({ ...t }));
+    if (tables.reduce((n, t) => n + Math.max(0, MAX_SEATS - t.seats), 0) < extra) return null;
+    for (let left = extra, i = 0; left > 0; i++) if (tables[i % tables.length].seats < MAX_SEATS) { tables[i % tables.length].seats += 1; left--; }
+    return { ...c, tables };
+  }
+  function addTables(c, extra, seats = 4) {
+    const next = { ...c, tables: [...c.tables] };
+    for (let left = extra; left > 0; left -= seats) {
+      const n = next.tables.length;
+      next.tables.push(boundTable(next, { id: id(), label: "Table " + (n + 1), seats, orientation: "H", x: 60 + n % 3 * 260, y: 70 + Math.floor(n / 3) % 2 * 170 }));
+    }
+    return next;
   }
   function csvCell(v) {
     let s = String(v ?? "");
@@ -177,7 +203,7 @@
   function snapshot(c, includeGender = false) {
     return { name: c.name, room: clone(roomSize(c)), tables: clone(c.tables), screen: clone(c.screen), furniture: clone(c.furniture || []), currentAssignment: clone(c.currentAssignment || {}), students: c.students.map((s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, preferredName: s.preferredName || "", name: s.name, ...includeGender ? { gender: s.gender || "" } : {} })), includeGender };
   }
-  const api = { roomSize, tableDimensions, boundTable, layoutPreset, clone, id, colors, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
+  const api = { roomSize, tableDimensions, boundTable, layoutPreset, clone, id, colors, shortage, addSeats, addTables, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
   if (typeof module !== "undefined") module.exports = api;
   else root.Seating = api;
 })(globalThis);

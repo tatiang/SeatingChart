@@ -1,3 +1,8 @@
+Oct 30, 2026 — 2:30 PM PT — HEAD — Randomizer now balances gender at each table and asks what to do when seats run out
+- With gender colors on, Randomize spreads each gender as evenly as possible across tables while keeping table sizes even. "No gender preference" is now an explicit option.
+- If there are more students than seats, a prompt offers to add the extra students to the first tables (one seat each, in turn, up to 8 seats) or add new tables of 4. Both can be undone.
+- Scripts now carry a version tag so a cached old file cannot mix with a new release.
+
 Oct 30, 2026 — 1:45 PM PT — HEAD — Added quick gender editing for a whole class
 - The Students tab has a gender dropdown on every student, plus "Apply to unspecified" and "Clear all" for the class. Changes can be undone.
 - Gender stays optional and is never guessed; bulk apply leaves students who already have a value unchanged.
