@@ -1,3 +1,7 @@
+Oct 30, 2026 — 1:45 PM PT — HEAD — Added quick gender editing for a whole class
+- The Students tab has a gender dropdown on every student, plus "Apply to unspecified" and "Clear all" for the class. Changes can be undone.
+- Gender stays optional and is never guessed; bulk apply leaves students who already have a value unchanged.
+
 Oct 30, 2026 — 1:20 PM PT — HEAD — Fixed cloud saving failing with an empty-field error
 - Saving any change, including an import, failed because the default display colors contained a blank name that the database rejects.
 - Removed it and now strip blank names when saved data loads. No student data was affected; the failed save changed nothing.
