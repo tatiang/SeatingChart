@@ -65,3 +65,8 @@ Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Produ
 
 ## Quick gender editing — Oct 30, 2026
 - `npm run check`: PASS, 27 tests and build. Fictional demo: per-student dropdown changes one student; Apply to unspecified filled 15 of 16 and kept the existing value; Undo reverted. Clear all confirmation not exercised in the browser.
+
+## Balanced randomizer and seat shortage — Oct 30, 2026
+- `npm run check`: PASS, 30 tests and build. New tests: 60 randomized classes keep each gender and table size within one of even; explicit no-preference mode ignores gender; seat/table shortage helpers.
+- Fictional demo: 25 students on 24 seats opens the prompt; adding the extra student gives the first table 5 seats. Adding tables and the Settings option were covered by tests only, not clicked.
+- A stale cached core.js caused an error during testing; fixed by version-tagging scripts in index.html.
