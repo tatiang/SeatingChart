@@ -58,3 +58,7 @@ Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Produ
 - Browser (fictional empty demo, synthetic names only): all five tabs show distinct pages; CSV file upload previews and imports two classes; pasted names append and Undo restores; pasted registrar columns exclude subject-teacher rows.
 - Google tab selection: tested on a scratch build with the three Google calls replaced by stubs. Only the selected tab is requested; 8 long previews scroll to the Import button; re-previewing the same source disables all 8 as already imported. 375px phone width has no horizontal scroll.
 - NOT verified: real Google consent, real tab listing and import of the registrar workbooks (requires the owner's sign-in). No real student data was imported or modified. No Firestore policy change, so emulator tests were not rerun.
+
+## Empty field name fix — Oct 30, 2026
+- `npm run check`: PASS, 27 tests and build; new test confirms migrated data has no empty field names anywhere.
+- Cause: default `genderColors` had a `""` key; Firestore rejects it on every whole-document save. Production save with the fix not yet confirmed by the owner.

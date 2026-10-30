@@ -1,3 +1,7 @@
+Oct 30, 2026 — 1:20 PM PT — HEAD — Fixed cloud saving failing with an empty-field error
+- Saving any change, including an import, failed because the default display colors contained a blank name that the database rejects.
+- Removed it and now strip blank names when saved data loads. No student data was affected; the failed save changed nothing.
+
 Oct 30, 2026 — 12:40 PM PT — HEAD — Added class and student imports that work with no classes yet
 - The Seats, Students, History, Templates and Settings tabs now each show their own page when an account has no classes, with import and create buttons.
 - New import window: CSV files, pasted names or spreadsheet cells, and the two registrar Google Sheets (read-only, choose tabs, review before saving). A Class column in a CSV creates several classes at once.

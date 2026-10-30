@@ -2,14 +2,16 @@
   "use strict";
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const id = () => globalThis.crypto?.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const colors = { F: "#b34b79", M: "#386bac", NB: "#7958a5", X: "#4b7b70", "": "#657789" };
+  const colors = { F: "#b34b79", M: "#386bac", NB: "#7958a5", X: "#4b7b70" };
   function student(s) {
     const parts = (s.name || "").trim().split(/\s+/);
     return { ...s, firstName: s.firstName ?? parts[0] ?? "", lastName: s.lastName ?? parts.slice(1).join(" "), preferredName: s.preferredName || "", gender: s.gender || "", notes: s.notes || "" };
   }
   function migrate(d) {
     if (!d || !Array.isArray(d.classes)) throw Error("Unrecognized saved data. No changes were saved.");
-    return { ...clone(d), version: 2, preferences: { showGender: false, nameStyle: "first", genderColors: colors, ...d.preferences }, templates: d.templates || [], classes: d.classes.map((c) => ({ ...c, students: (c.students || []).map(student), tables: (c.tables || []).map((t) => ({ ...t, seats: Math.max(t.seats || 4, (c.currentAssignment?.[t.id] || []).length) })), furniture: c.furniture || [], seatingHistory: c.seatingHistory || [], constraints: { excludedStudents: [], keepApart: [], genderMode: "mixed", ...c.constraints }, lockedStudents: c.lockedStudents || [], screen: c.screen || { x: 300, y: 8, orientation: "H" } })) };
+    const preferences = { showGender: false, nameStyle: "first", genderColors: colors, ...d.preferences };
+    preferences.genderColors = Object.fromEntries(Object.entries(preferences.genderColors || colors).filter(([k]) => k.trim()));
+    return { ...clone(d), version: 2, preferences, templates: d.templates || [], classes: d.classes.map((c) => ({ ...c, students: (c.students || []).map(student), tables: (c.tables || []).map((t) => ({ ...t, seats: Math.max(t.seats || 4, (c.currentAssignment?.[t.id] || []).length) })), furniture: c.furniture || [], seatingHistory: c.seatingHistory || [], constraints: { excludedStudents: [], keepApart: [], genderMode: "mixed", ...c.constraints }, lockedStudents: c.lockedStudents || [], screen: c.screen || { x: 300, y: 8, orientation: "H" } })) };
   }
   function roomSize(c) { return { width: c.room?.width || 840, height: c.room?.height || 520 }; }
   function tableDimensions(c, t) {
