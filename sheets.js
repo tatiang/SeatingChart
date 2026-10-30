@@ -1,5 +1,3 @@
-const ROSTER_SHEET_ID='1uvuCvkcqCLXokBlRlHJTtqE6S2UpMP-mKQbuyTBaws4';
-const GRADE_MAP={'kindergarten':'K','kinder':'K','k':'K','first grade':'1','1st grade':'1','1st':'1','second grade':'2','2nd grade':'2','2nd':'2','third grade':'3','3rd grade':'3','3rd':'3','fourth grade':'4','4th grade':'4','4th':'4','fifth grade':'5','5th grade':'5','5th':'5','sixth grade':'6','6th grade':'6','6th':'6'};
 async function getSheetsToken(userEmail){
   const provider=new firebase.auth.GoogleAuthProvider();
   provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
@@ -10,44 +8,28 @@ async function getSheetsToken(userEmail){
   return result.credential?.accessToken||null;
 }
 
-async function fetchAllRosters(token){
-  const BASE='https://sheets.googleapis.com/v4/spreadsheets';
-  const h={Authorization:`Bearer ${token}`};
-  const metaRes=await fetch(`${BASE}/${ROSTER_SHEET_ID}?fields=sheets.properties`,{headers:h});
-  if(!metaRes.ok)throw new Error(`Sheets API error ${metaRes.status} — try signing in again`);
-  const meta=await metaRes.json();
-  const classes=[];
-  for(const sheet of(meta.sheets||[])){
-    const title=sheet.properties.title;
-    const grade=GRADE_MAP[title.trim().toLowerCase()];
-    if(!grade)continue;
-    const valRes=await fetch(`${BASE}/${ROSTER_SHEET_ID}/values/${encodeURIComponent(title)}`,{headers:h});
-    if(!valRes.ok)continue;
-    const{values:rows=[]}=await valRes.json();
-    // Find the teacher row (first row containing a cell starting with "Teacher:")
-    let teacherRowIdx=-1;
-    for(let i=0;i<Math.min(rows.length,8);i++){
-      if((rows[i]||[]).some(c=>c&&/^Teacher:/i.test(c))){teacherRowIdx=i;break;}
-    }
-    if(teacherRowIdx<0)continue;
-    const teacherRow=rows[teacherRowIdx];
-    const numCols=Math.max(...rows.map(r=>(r||[]).length));
-    for(let col=0;col<numCols;col++){
-      const teacherCell=(teacherRow[col]||'').trim();
-      if(!/^Teacher:/i.test(teacherCell))continue;
-      const teacherName=teacherCell.replace(/^Teacher:\s*/i,'').trim();
-      const lastName=teacherName.split(' ').pop();
-      const code=`${grade}${lastName[0].toUpperCase()}`;
-      // Students start 2 rows after teacher row (skipping support teacher row)
-      const students=[];
-      for(let r=teacherRowIdx+2;r<rows.length;r++){
-        const cell=((rows[r]||[])[col]||'').trim();
-        if(!cell||/^bold\s*=/i.test(cell))continue;
-        students.push(cell);
-      }
-      if(students.length>0)classes.push({code,teacher:teacherName,grade:title.trim(),students});
-    }
-  }
-  return classes;
+const REGISTRAR_SOURCES=[
+ {label:'K–4 Class Lists 2026–2027',id:'18LCnerCUBWiPmry-wrw_ifrQiGoHiMx10HEnLaIFU_4'},
+ {label:'5–8 Class Lists 2026–2027',id:'1BzCLhNBellOKfpdY3fxWwveH2tG3ZChQk5os2Yaxn5Y'}
+];
+async function sheetsRead(token,path){
+ const response=await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+path,{headers:{Authorization:`Bearer ${token}`}});
+ if(!response.ok)throw Error(`Google Sheets returned ${response.status}. Check this account can open the sheet and grant read-only access. You can also copy cells and use Paste / CSV.`);
+ return response.json();
 }
-
+async function listRosterTabs(token,id){
+ const meta=await sheetsRead(token,`${id}?fields=sheets.properties`);
+ return meta.sheets.map(s=>s.properties).filter(s=>s.sheetType==='GRID'||!s.sheetType);
+}
+async function fetchRosterTabs(token,id,tabs){
+ const groups=[],warnings=[];
+ for(const tab of tabs){
+  if(tab.gridProperties?.rowCount>2000||tab.gridProperties?.columnCount>52)throw Error(`“${tab.title}” exceeds the import limit (2,000 rows / 52 columns). Copy the roster cells into Paste / CSV instead.`);
+  const range="'"+tab.title.replace(/'/g,"''")+"'!A1:AZ2000";
+  const data=await sheetsRead(token,`${id}/values/${encodeURIComponent(range)}`);
+  const rows=data.values||[],parsed=RosterImport.registrar(rows,tab.title);
+  if(!parsed.length){warnings.push(`No registrar layout recognized in “${tab.title}”. Copy its student column into Paste / CSV.`);continue;}
+  groups.push(...parsed.map(g=>({...g,sourceKey:`${id}:${tab.sheetId}:${g.key}`})));
+ }
+ return {groups,warnings};
+}

@@ -28,6 +28,7 @@ function Dialog({ title, onClose, children }) {
   }}><header><h2>{title}</h2><button aria-label="Close dialog" onClick={onClose}>×</button></header>{children}</dialog>;
 }
 function Demo() {
+  if(new URLSearchParams(location.search).get("empty")==="1") return S.migrate({classes:[],activeClassId:null});
   const c = S.makeClass("English 9A");
   c.students = ["Emma", "Liam", "Sophie", "Noah", "Ava", "Ethan", "Mia", "Lucas", "Olivia", "Jackson", "Amelia", "Elijah", "Harper", "Aiden", "Chloe", "Daniel"].map((name) => S.student({ id: S.id(), name }));
   c.currentAssignment = S.randomize(c);
@@ -327,7 +328,7 @@ function App() {
  <div className="mobile-bar no-print"><button onClick={() => setDrawer(drawer === "classes" ? "" : "classes")}>☰ Classes & tools</button><button onClick={() => setDrawer(drawer === "roster" ? "" : "roster")}>Students ({c?.students.length || 0})</button></div>
  {error && <div className="error-banner no-print" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError("")}>×</button></div>}
  <div className="workspace">
- <aside className={"left-sidebar no-print " + (drawer === "classes" ? "open" : "")}><section className="panel classes"><div className="panel-heading"><h2>Classes</h2><Button icon="plus" className="primary square" aria-label="Create class" onClick={() => setModal("newClass")} /></div><div className="class-list">{data.classes.filter((x) => !!x.archived === archived).map((x, i) => <div className={"class-row " + (x.id === c?.id ? "active" : "")} key={x.id}><button onClick={() => selectClass(x.id)}><i style={{ background: ["#80b8fd", "#ed94bc", "#77c8aa", "#ab99e8", "#e7bf60"][i % 5] }} />{x.name}</button>{archived && <button aria-label={"Restore " + x.name} onClick={() => commit((d) => ({ ...d, classes: d.classes.map((y) => y.id === x.id ? { ...y, archived: false } : y) }))}>↩</button>}</div>)}{!data.classes.length && <p className="muted">Create your first class to get started.</p>}</div><button className="archive-link" onClick={() => setArchived(!archived)}>{archived ? "Active classes" : "Archived classes"} <span>→</span></button></section>
+ <aside className={"left-sidebar no-print " + (drawer === "classes" ? "open" : "")}><section className="panel classes"><div className="panel-heading"><h2>Classes</h2><Button icon="plus" className="primary square" aria-label="Create class" onClick={() => setModal("newClass")} /></div><div className="class-list">{data.classes.filter((x) => !!x.archived === archived).map((x, i) => <div className={"class-row " + (x.id === c?.id ? "active" : "")} key={x.id}><button onClick={() => selectClass(x.id)}><i style={{ background: ["#80b8fd", "#ed94bc", "#77c8aa", "#ab99e8", "#e7bf60"][i % 5] }} />{x.name}</button>{archived && <button aria-label={"Restore " + x.name} onClick={() => commit((d) => ({ ...d, classes: d.classes.map((y) => y.id === x.id ? { ...y, archived: false } : y) }))}>↩</button>}</div>)}{!data.classes.length && <p className="muted">Create your first class to get started.</p>}</div><button className="import-entry" onClick={() => setModal("import")}>Import classes / students</button><button className="archive-link" onClick={() => setArchived(!archived)}>{archived ? "Active classes" : "Archived classes"} <span>→</span></button></section>
  <section className="panel tools"><h2>Tools</h2>{[["move", "Select / Move", () => {
     setTab("Seats");
     setPicked(null);
@@ -341,7 +342,7 @@ function App() {
     setModal("share");
   }]].map(([icon, label, fn], i) => <Button key={label} icon={icon} className={i === 0 ? "tool active" : "tool"} disabled={!c || label === "Rotate" && !selected} onClick={fn}>{label}</Button>)}<div className="save-status" role="status"><i />{sync}{sync.startsWith("Save failed") && <button onClick={() => setUndoTick((x) => x + 1)}>Retry</button>}</div></section></aside>
  <main className="main-workspace"><h1 className="print-title">{c?.name}</h1><div className="workspace-heading no-print"><div><p className="eyebrow">YOUR CLASSROOM, THOUGHTFULLY ARRANGED</p><h2>{c?.name || "Welcome to your classroom"}</h2></div>{c && <div className="history-controls"><Button icon="undo" aria-label="Undo" disabled={!past.current.length} onClick={() => undo(false)} /><Button icon="redo" aria-label="Redo" disabled={!future.current.length} onClick={() => undo(true)} /><button onClick={() => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch((e) => setError(e.message))}>Present</button><button onClick={() => setModal("class")}>Class options</button></div>}</div>
- {!c ? <div className="empty-state"><span>🪑</span><h2>Make room for a great day.</h2><p>Create a class, add your students, and arrange your space.</p><Button icon="plus" className="primary" onClick={() => setModal("newClass")}>Create a class</Button></div> : <>
+ {!c ? <EmptyWorkspace tab={tab} prefs={prefs} setPref={setPref} create={() => setModal("newClass")} importRoster={() => setModal("import")} /> : <>
  {tab === "Seats" && <><div className="canvas-toolbar no-print"><button className="orientation" onClick={() => setModal("room")}>Room designer</button><div className="segmented">{["room", "grid", "list"].map((v) => <Button key={v} icon={v === "grid" ? "seats" : v} className={view === v ? "active" : ""} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</Button>)}</div></div><div className="canvas-viewport" ref={viewport}><Chart c={c} prefs={prefs} view={view} zoom={zoom * fit} selected={selected} setSelected={setSelected} update={update} picked={picked} setPicked={setPicked} place={place} startStudentDrag={startStudentDrag} /></div><div className="canvas-footer no-print">{picked && <button onClick={() => {
     if (c.lockedStudents.includes(picked)) {
       setError("Unlock the student in Settings first.");
@@ -363,7 +364,7 @@ function App() {
     const t = c.tables.find((t2) => t2.id === selected);
     update((x) => ({ ...x, tables: [...x.tables, { ...t, id: S.id(), label: t.label + " copy", x: Math.min(650, t.x + 30), y: Math.min(330, t.y + 30) }] }));
   }} />}</>}
- {tab === "Students" && <section className="content-panel"><div className="panel-heading"><h2>Student management</h2><Button icon="plus" className="primary" onClick={() => setModal({ student: null })}>Add student</Button></div><div className="button-row"><button onClick={() => setModal("import")}>Import CSV</button><button onClick={() => setModal("sheets")}>Import Google Sheets</button><button onClick={() => download(c.name + "-roster.csv", S.csv([["First name", "Last name", "Preferred name"], ...c.students.map((s) => [s.firstName, s.lastName, s.preferredName])]))}>Export roster CSV</button></div><p className="muted">Notes are private to you. Gender is optional and never inferred.</p>{c.students.map((s) => <div className="student-management" key={s.id}><div><strong>{S.display(s, "full")}</strong><small>{S.locate(c.currentAssignment, s.id) ? "Assigned" : "Unassigned"}{c.lockedStudents.includes(s.id) ? " \xB7 Locked" : ""}</small></div><button onClick={() => setModal({ student: s })}>Edit</button></div>)}</section>}
+ {tab === "Students" && <section className="content-panel"><div className="panel-heading"><h2>Student management</h2><Button icon="plus" className="primary" onClick={() => setModal({ student: null })}>Add student</Button></div><div className="button-row"><button onClick={() => setModal("import")}>Import / Paste / CSV</button><button onClick={() => setModal("sheets")}>Import Google Sheets</button><button onClick={() => download(c.name + "-roster.csv", S.csv([["First name", "Last name", "Preferred name"], ...c.students.map((s) => [s.firstName, s.lastName, s.preferredName])]))}>Export roster CSV</button></div><p className="muted">Notes are private to you. Gender is optional and never inferred.</p>{c.students.map((s) => <div className="student-management" key={s.id}><div><strong>{S.display(s, "full")}</strong><small>{S.locate(c.currentAssignment, s.id) ? "Assigned" : "Unassigned"}{c.lockedStudents.includes(s.id) ? " \xB7 Locked" : ""}</small></div><button onClick={() => setModal({ student: s })}>Edit</button></div>)}</section>}
  {tab === "History" && <section className="content-panel"><div className="panel-heading"><h2>Seating history</h2><button className="primary" onClick={() => setModal({ naming: "arrangement" })}>Save current arrangement</button></div>{!c.seatingHistory.length && <p className="muted">Saved arrangements and randomization history appear here.</p>}{c.seatingHistory.map((h) => <article className="history-row" key={h.id}><div><strong>{h.name || "Seating arrangement"}</strong><small>{new Date(h.date).toLocaleString()}</small></div><button onClick={async () => {
     if (await confirmAction("Restore this arrangement? You can undo this change.")) update((x) => ({ ...x, currentAssignment: S.clone(h.assignment), room: h.room || S.roomSize(x), tables: h.tables ? S.clone(h.tables) : x.tables, screen: h.screen || x.screen, furniture: h.furniture || x.furniture, lockedStudents: [] }));
   }}>Restore</button></article>)}</section>}
@@ -384,7 +385,7 @@ function App() {
     setDrawer("");
   }} aria-pressed={picked === s.id}><span className={S.locate(c.currentAssignment, s.id) ? "assigned-dot" : "unassigned-dot"} /><span>{S.display(s, "full")}</span><span className="drag-handle">{c.lockedStudents.includes(s.id) ? "\u{1F512}" : "\u283F"}</span></button>)}</div><button className="add-student" disabled={!c} onClick={() => setModal({ student: null })}>＋ Add Student</button></section><section className="panel display-options"><h2>Display Options</h2><label className="toggle-label"><span>Show gender colors</span><input type="checkbox" role="switch" checked={prefs.showGender} onChange={(e) => setPref("showGender", e.target.checked)} /></label><p>Optional. Off by default for a neutral view.</p><label>Name display<select value={prefs.nameStyle} onChange={(e) => setPref("nameStyle", e.target.value)}><option value="first">First names</option><option value="initial">First + last initial</option><option value="full">Full names</option></select></label></section></aside>
  </div>
- {modal && <Dialog title={typeof modal === "object" ? modal.naming ? "Choose a name" : "Student details" : { room: "Room designer", newClass: "Create a class", class: "Class options", random: "Preview seating arrangement", export: "Print & export", share: "Share a view-only chart", import: "Import students", sheets: "Import Google Sheets", help: "A little help" }[modal] || "Seating Chart"} onClose={() => {
+ {modal && <Dialog title={typeof modal === "object" ? modal.naming ? "Choose a name" : "Student details" : { room: "Room designer", newClass: "Create a class", class: "Class options", random: "Preview seating arrangement", export: "Print & export", share: "Share a view-only chart", import: "Import classes and students", sheets: "Import Google Sheets", help: "A little help" }[modal] || "Seating Chart"} onClose={() => {
     setModal(null);
     setPreview(null);
   }}>
@@ -439,15 +440,18 @@ function App() {
     setModal(null);
     setTimeout(print, 100);
   }}>Print chart / Save PDF</button><p className="muted">Notes never appear in printed charts or seating exports.</p></div>}
- {modal === "import" && <ImportStudents onImport={(students) => {
-    update((x) => ({ ...x, students: [...x.students, ...students] }));
-    setModal(null);
-  }} />}
- {modal === "sheets" && <SheetsImport demo={demo} user={user} onImport={(roster) => {
-    const nc = S.makeClass(roster.code);
-    nc.students = roster.students.map((name) => S.student({ id: S.id(), name }));
-    commit((d) => ({ ...d, classes: [...d.classes, nc], activeClassId: nc.id }));
-    setModal(null);
+ {(modal === "import" || modal === "sheets") && <RosterImporter demo={demo} user={user} current={c} existing={data.classes} initialMode={modal === "sheets" ? "sheets" : "text"} onImport={(groups,destination)=>{
+    commit(d=>{
+      if(destination==='current'){
+        const target=d.classes.find(x=>x.id===d.activeClassId);
+        if(!target)throw Error('Choose a class first.');
+        target.students.push(...groups.flatMap(g=>g.students).map(s=>S.student({...s,id:S.id()})));
+      }else{
+        const added=groups.map(g=>({...S.makeClass(g.name),students:g.students.map(s=>S.student({...s,id:S.id()})),...(g.sourceKey?{rosterSource:g.sourceKey}:{})}));
+        d.classes.push(...added);d.activeClassId=added[0].id;
+      }
+      return d;
+    });setModal(null);setTab('Students');setDrawer('');
   }} />}
  {modal === "share" && <SharePanel c={c} user={user} demo={demo} includeGender={outputGender} setIncludeGender={setOutputGender} />}
  {modal === "room" && <RoomDesigner c={c} update={update} onApplied={() => {setSelected(null);setZoom(1);setModal(null);}} />}
@@ -540,42 +544,23 @@ function StudentForm({ prefs, student, save, remove }) {
     save(S.student(s));
   }}><div className="form-columns"><label>First name<input name="firstName" required autoFocus defaultValue={student?.firstName || ""} /></label><label>Last name<input name="lastName" defaultValue={student?.lastName || ""} /></label></div><label>Preferred / display name<input name="preferredName" defaultValue={student?.preferredName || ""} /></label><label>Gender (optional)<select name="gender" defaultValue={student?.gender || ""}><option value="">Unspecified / remove information</option>{Object.entries(prefs.genderLabels || { F: "Female", M: "Male", NB: "Nonbinary", X: "Other / self-described" }).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>Private notes<textarea name="notes" rows="3" defaultValue={student?.notes || ""} /></label><p className="muted">Only your account can read these notes. They are omitted from shared charts and exports.</p><div className="button-row"><button className="primary">Save student</button>{student && <button type="button" className="danger" onClick={remove}>Remove student</button>}</div></form>;
 }
-function ImportStudents({ onImport }) {
-  const [text, setText] = useState(""), [error, setError] = useState(""), [preview, setPreview] = useState(null);
-  return <><p>Use headers: First name, Last name, Preferred name, Gender. Only a name is required. Existing students are preserved.</p><input type="file" accept=".csv,text/csv" aria-label="Choose CSV file" onChange={async (e) => {
-    const f = e.target.files[0];
-    if (f) {
-      setText(await f.text());
-      setPreview(null);
-    }
-  }} /><textarea aria-label="CSV content" rows="7" value={text} placeholder={"First name,Last name\nAlex,Rivera"} onChange={(e) => {
-    setText(e.target.value);
-    setPreview(null);
-  }} />{error && <p role="alert">{error}</p>}{preview && <p>{preview.length} students ready: {preview.slice(0, 5).map((s) => s.name).join(", ")}</p>}<button className="primary" disabled={!text.trim()} onClick={() => {
-    try {
-      if (preview) onImport(preview);
-      else {
-        setPreview(S.importCSV(text));
-        setError("");
-      }
-    } catch (e) {
-      setError(e.message);
-    }
-  }}>{preview ? "Add students" : "Preview import"}</button></>;
+function EmptyWorkspace({tab,prefs,setPref,create,importRoster}) {
+  const copy={Seats:['Your classroom starts here','Create a class or import a roster to arrange your six-table Creativity Lab.'],Students:['Add your first roster','Import classes and students from CSV, pasted text, or the registrar’s Google Sheets.'],History:['Seating history','Saved arrangements will appear here after you create a class.'],Templates:['Layout templates','New classes start with Creativity Lab. Room designer also offers rows, pods and horseshoe layouts. Save your own layouts once a class exists.'],Settings:['Display settings','These preferences apply to your account. Create a class to manage room furniture and seating restrictions.']}[tab];
+  return <section className="content-panel empty-workspace"><h2>{copy[0]}</h2><p>{copy[1]}</p>{tab==='Settings'&&<><label><input type="checkbox" checked={prefs.showGender} onChange={e=>setPref('showGender',e.target.checked)}/> Show optional gender colors</label><label>Name display<select value={prefs.nameStyle} onChange={e=>setPref('nameStyle',e.target.value)}><option value="first">First names</option><option value="initial">First + last initial</option><option value="full">Full names</option></select></label></>}<div className="button-row"><button className="primary" onClick={importRoster}>Import classes / students</button><button onClick={create}>Create a class</button></div></section>;
 }
-function SheetsImport({ demo, user, onImport }) {
-  const [rosters, setRosters] = useState([]), [status, setStatus] = useState("");
-  return <><p>Import a class from the existing school roster spreadsheet. Google will request read-only Sheets access for your school account.</p><button disabled={demo || status === "Loading\u2026"} onClick={async () => {
-    setStatus("Loading\u2026");
-    try {
-      const token = await getSheetsToken(user.email);
-      const rows = await fetchAllRosters(token);
-      setRosters(rows);
-      setStatus(rows.length ? "Choose a class" : "No matching roster tabs found.");
-    } catch (e) {
-      setStatus(e.message);
-    }
-  }}>Connect school Google Sheets</button><p role="status">{demo ? "School imports are disabled in the fictional demo." : status}</p>{rosters.map((r, i) => <button className="roster-choice" key={i} onClick={() => onImport(r)}>{r.code} · {r.teacher} · {r.students.length} students</button>)}</>;
+function RosterImporter({demo,user,current,existing,initialMode,onImport}) {
+  const [mode,setMode]=useState(initialMode),[text,setText]=useState(''),[format,setFormat]=useState('auto'),[name,setName]=useState('Imported class'),[groups,setGroups]=useState([]),[chosen,setChosen]=useState([]),[destination,setDestination]=useState(current?'current':'new'),[error,setError]=useState(''),[warnings,setWarnings]=useState([]),[busy,setBusy]=useState(false);
+  const [source,setSource]=useState(REGISTRAR_SOURCES[0].id),[tabs,setTabs]=useState([]),[selectedTabs,setSelectedTabs]=useState([]);const token=useRef(null);
+  const reset=()=>{setGroups([]);setChosen([]);setError('');setWarnings([]);};
+  const preview=items=>{setGroups(items);setChosen(items.map((g,i)=>existing.some(c=>g.sourceKey&&c.rosterSource===g.sourceKey)?null:i).filter(i=>i!==null));if(items.length>1)setDestination('new');};
+  const run=async(fn)=>{setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{setBusy(false);}};
+  const selected=groups.filter((g,i)=>chosen.includes(i));
+  const duplicates=selected.flatMap(g=>g.students).filter(s=>destination==='current'&&current?.students.some(q=>q.name.trim().toLowerCase()===s.name.trim().toLowerCase())).length;
+  return <div className="dialog-stack"><div className="segmented"><button className={mode==='text'?'active':''} onClick={()=>{setMode('text');reset();}}>Paste / CSV</button><button className={mode==='sheets'?'active':''} onClick={()=>{setMode('sheets');reset();}}>Registrar Google Sheets</button></div>
+  {mode==='text'?<><p>Paste one name per line, copy cells from a spreadsheet, or upload CSV/TSV. CSV headers can include Name, First name, Last name, Preferred name, Gender, and Class. A Class column creates separate class previews.</p><label>Class / sheet name<input value={name} onChange={e=>{setName(e.target.value);reset();}}/></label><label>Input format<select value={format} onChange={e=>{setFormat(e.target.value);reset();}}><option value="auto">Detect CSV / pasted columns / registrar</option><option value="names">One name per line (keep commas in names)</option><option value="registrar">Registrar columns including headers</option></select></label><label>Choose CSV or text file<input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={e=>{const file=e.target.files[0];if(file)run(async()=>{reset();if(file.size>2000000)throw Error('Choose a file under 2 MB.');setText(await file.text());});}}/></label><textarea aria-label="Roster text" rows="7" value={text} placeholder={'Name,Class\nAlex Rivera,Science A\nMorgan Lee,Science B'} onChange={e=>{setText(e.target.value);reset();}}/><button disabled={busy||!text.trim()} onClick={()=>run(()=>preview(RosterImport.parse(text,{format,name:name.trim()||'Imported class'})))}>Preview import</button></>:<><p>Read-only connection to your registrar’s sheets. Choose tabs, then review the detected classes. Nothing is saved until you import selected classes.</p><label>Registrar workbook<select value={REGISTRAR_SOURCES.some(s=>s.id===source)?source:'custom'} onChange={e=>{setSource(e.target.value==='custom'?'':e.target.value);setTabs([]);setSelectedTabs([]);reset();}}>{REGISTRAR_SOURCES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}<option value="custom">Another Google Sheet</option></select></label><label>Spreadsheet link or ID<input value={source} onChange={e=>{setSource(e.target.value);setTabs([]);setSelectedTabs([]);reset();}}/></label><button disabled={demo||busy||!source.trim()} onClick={()=>run(async()=>{reset();token.current=await getSheetsToken(user.email);if(!token.current)throw Error('Google did not return read-only Sheets access.');setTabs(await listRosterTabs(token.current,RosterImport.sheetId(source)));setSelectedTabs([]);})}>{busy?'Loading…':'Connect and list tabs'}</button>{demo&&<p>Google connection is disabled in this fictional demo. Paste synthetic registrar data to test imports.</p>}{tabs.length>0&&<fieldset><legend>Choose roster tabs</legend><button type="button" onClick={()=>setSelectedTabs(tabs.map(t=>t.sheetId))}>Select all tabs</button>{tabs.map(t=><label key={t.sheetId}><input type="checkbox" checked={selectedTabs.includes(t.sheetId)} onChange={e=>setSelectedTabs(old=>e.target.checked?[...old,t.sheetId]:old.filter(id=>id!==t.sheetId))}/>{t.title}</label>)}<button disabled={busy||!selectedTabs.length} onClick={()=>run(async()=>{reset();const result=await fetchRosterTabs(token.current,RosterImport.sheetId(source),tabs.filter(t=>selectedTabs.includes(t.sheetId)));preview(result.groups);setWarnings(result.warnings);})}>Preview selected tabs</button></fieldset>}</>}
+  {error&&<p role="alert" className="error">{error}</p>}{warnings.map(w=><p role="status" key={w}>{w}</p>)}
+  {groups.length>0&&<><h3>Review classes and students</h3><label>Import destination<select value={destination} onChange={e=>setDestination(e.target.value)}><option value="new">Create new classes (preserve existing classes)</option>{current&&<option value="current">Add students to {current.name}</option>}</select></label>{groups.map((g,i)=>{const imported=existing.some(c=>g.sourceKey&&c.rosterSource===g.sourceKey);return <article className="import-preview" key={i}><label><input type="checkbox" disabled={imported} checked={chosen.includes(i)} onChange={e=>setChosen(old=>e.target.checked?[...old,i]:old.filter(n=>n!==i))}/><strong>{g.name}</strong> · {g.students.length} students {imported&&'— already imported'}</label>{!imported&&destination==='new'&&<label>New class name<input value={g.name} onChange={e=>setGroups(old=>old.map((q,j)=>j===i?{...q,name:e.target.value}:q))}/></label>}<details><summary>Review student names</summary><ul>{g.students.map((s,j)=><li key={j}>{s.name}</li>)}</ul></details></article>;})}{duplicates>0&&<p role="alert">{duplicates} names already exist in the current class. Import will add separate students with those names; deselect those classes or choose new classes if this is a repeated import.</p>}<p>{selected.length} classes selected · {selected.reduce((n,g)=>n+g.students.length,0)} students. Existing students and seating are preserved. Undo is available.</p><button className="primary" disabled={busy||!selected.length||selected.some(g=>!g.name.trim())} onClick={()=>onImport(selected,destination)}>{destination==='new'?'Import selected classes':'Add selected students'}</button></>}
+  </div>;
 }
 function Settings({ c, update, prefs, setPref, onNewCategory }) {
   const [a, setA] = useState(""), [b, setB] = useState("");

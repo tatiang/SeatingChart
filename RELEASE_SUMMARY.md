@@ -28,3 +28,8 @@ The active app and rules now require tgreenleaf@markdayschool.org with verified 
 
 ## Production release — October 30, 2026
 Firebase access resolved using the school account. Owner-only Firestore rules deployed successfully; existing records untouched. Publishing this release at https://tatiang.github.io/SeatingChart/ via main.
+
+## Roster imports and empty-account navigation — October 30, 2026
+Every top tab now has its own page for accounts with no classes, and an import window is available from those pages, the class sidebar and the Students tab. It reads CSV/TSV/text files, pasted names or spreadsheet cells, and both registrar workbooks through read-only Google access (choose tabs, preview, then import). Existing classes, students and seating are never replaced; imports can be undone. Names are never given a gender. Private notes are untouched. No Firestore rules, hosting project or dependency changed.
+
+Limitation: the Google consent and tab-listing flow has only been exercised with synthetic stand-ins; it needs the owner's own first sign-in. No real roster was imported during testing.
