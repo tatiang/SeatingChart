@@ -62,3 +62,6 @@ Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Produ
 ## Empty field name fix — Oct 30, 2026
 - `npm run check`: PASS, 27 tests and build; new test confirms migrated data has no empty field names anywhere.
 - Cause: default `genderColors` had a `""` key; Firestore rejects it on every whole-document save. Production save with the fix not yet confirmed by the owner.
+
+## Quick gender editing — Oct 30, 2026
+- `npm run check`: PASS, 27 tests and build. Fictional demo: per-student dropdown changes one student; Apply to unspecified filled 15 of 16 and kept the existing value; Undo reverted. Clear all confirmation not exercised in the browser.
