@@ -1,3 +1,8 @@
+Oct 30, 2026 — 12:40 PM PT — HEAD — Added class and student imports that work with no classes yet
+- The Seats, Students, History, Templates and Settings tabs now each show their own page when an account has no classes, with import and create buttons.
+- New import window: CSV files, pasted names or spreadsheet cells, and the two registrar Google Sheets (read-only, choose tabs, review before saving). A Class column in a CSV creates several classes at once.
+- Imports add new classes or append to the current one, can be undone, and a registrar class already imported is blocked from importing twice. Teacher and legend rows are never imported as students.
+
 Oct 30, 2026 — 8:22 AM PT — HEAD — Prepared the verified owner-only production release
 - Deployed owner-only Firestore rules after model/build and authorization tests passed.
 - Retained previous rules locally; existing student records were not changed.

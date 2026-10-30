@@ -51,3 +51,10 @@ These checks were deliberately not represented as completed.
 
 ## Production deployment — October 30, 2026
 Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Production command `npx firebase deploy --only firestore:rules --project seatingchart-a4cae --account tgreenleaf@markdayschool.org --non-interactive`: PASS, rules released to cloud.firestore. Previous rules backed up outside repository.
+
+## Roster imports — Oct 30, 2026
+- `npm run check`: PASS, 26 tests and production build. Review added tests for a CSV Class column of section-like values (7A/7B, previously misread as registrar headers) and delimiter detection from the header line.
+- `git diff --check`: PASS.
+- Browser (fictional empty demo, synthetic names only): all five tabs show distinct pages; CSV file upload previews and imports two classes; pasted names append and Undo restores; pasted registrar columns exclude subject-teacher rows.
+- Google tab selection: tested on a scratch build with the three Google calls replaced by stubs. Only the selected tab is requested; 8 long previews scroll to the Import button; re-previewing the same source disables all 8 as already imported. 375px phone width has no horizontal scroll.
+- NOT verified: real Google consent, real tab listing and import of the registrar workbooks (requires the owner's sign-in). No real student data was imported or modified. No Firestore policy change, so emulator tests were not rerun.
