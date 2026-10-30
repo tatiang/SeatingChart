@@ -23,14 +23,22 @@
     const r=roomSize(c), [w,h]=tableDimensions(c,t), snap=c.room?.snap ? 10 : 1;
     return {...t,x:Math.max(0,Math.min(r.width-w,Math.round(x/snap)*snap)),y:Math.max(0,Math.min(r.height-h,Math.round(y/snap)*snap))};
   }
+  function scaleTables(c, factor) {
+    const cx = c.tables.length ? c.tables.reduce((n, t) => n + t.x, 0) / c.tables.length : 0, cy = c.tables.length ? c.tables.reduce((n, t) => n + t.y, 0) / c.tables.length : 0;
+    const tables = c.tables.map((t) => {
+      const [w, h] = tableDimensions(c, t), base = t.orientation === "V" ? [h, w] : [w, h];
+      return { ...t, x: cx + (t.x - cx) * factor, y: cy + (t.y - cy) * factor, width: Math.round(Math.max(100, Math.min(400, base[0] * factor))), height: Math.round(Math.max(90, Math.min(300, base[1] * factor))) };
+    }), next = { ...c, tables };
+    return { ...next, tables: tables.map((t) => boundTable(next, t)) };
+  }
   function layoutPreset(kind="lab") {
     const room={width:1100,height:600,snap:true}, screen={x:1035,y:190,orientation:"V",label:"SCREEN"};
-    let positions=Array.from({length:6},(_,i)=>[70+i%3*260,100+Math.floor(i/3)*270]);
+    let positions=Array.from({length:6},(_,i)=>[70+i%3*290,90+Math.floor(i/3)*280]);
     let seats=4;
     if(kind==="rows") {positions=Array.from({length:12},(_,i)=>[70+i%4*210,80+Math.floor(i/4)*170]);seats=2;}
     if(kind==="horseshoe") positions=[[80,70],[80,240],[80,410],[360,70],[360,410],[640,70],[640,410]];
     if(kind==="pods") positions=[[80,100],[410,100],[740,100],[80,370],[410,370],[740,370]];
-    return {room,screen,tables:positions.map(([x,y],i)=>({id:id(),label:`Table ${i+1}`,x,y,seats,orientation:"H",shape:kind==="pods"?"round":"rectangle",width:kind==="pods"?180:200,height:kind==="pods"?180:130})),furniture:[]};
+    return {room,screen,tables:positions.map(([x,y],i)=>({id:id(),label:`Table ${i+1}`,x,y,seats,orientation:"H",shape:kind==="pods"?"round":"rectangle",width:kind==="pods"?200:236,height:kind==="pods"?200:150})),furniture:[]};
   }
   function makeClass(name) {
     return { id: id(), name, students: [], ...layoutPreset(), seatingHistory: [], currentAssignment: {}, constraints: { genderMode: "mixed", excludedStudents: [], keepApart: [] }, lockedStudents: [] };
@@ -203,7 +211,7 @@
   function snapshot(c, includeGender = false) {
     return { name: c.name, room: clone(roomSize(c)), tables: clone(c.tables), screen: clone(c.screen), furniture: clone(c.furniture || []), currentAssignment: clone(c.currentAssignment || {}), students: c.students.map((s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, preferredName: s.preferredName || "", name: s.name, ...includeGender ? { gender: s.gender || "" } : {} })), includeGender };
   }
-  const api = { roomSize, tableDimensions, boundTable, layoutPreset, clone, id, colors, shortage, addSeats, addTables, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
+  const api = { roomSize, tableDimensions, boundTable, scaleTables, layoutPreset, clone, id, colors, shortage, addSeats, addTables, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
   if (typeof module !== "undefined") module.exports = api;
   else root.Seating = api;
 })(globalThis);

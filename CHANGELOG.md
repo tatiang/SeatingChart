@@ -1,3 +1,8 @@
+Oct 30, 2026 — 4:10 PM PT — HEAD — Made the Room view larger, clearer and more polished
+- New classes get larger tables, and student names in the Room view are bigger and bolder; empty seats show a clearer "+".
+- Warmer wood floor, softer table shadows and chairs. Printing and exports are unchanged.
+- Room designer has Larger tables and Smaller tables buttons (about 15% each, also spreading the layout). Existing classes keep their saved sizes until you use them; both can be undone.
+
 Oct 30, 2026 — 2:30 PM PT — HEAD — Randomizer now balances gender at each table and asks what to do when seats run out
 - With gender colors on, Randomize spreads each gender as evenly as possible across tables while keeping table sizes even. "No gender preference" is now an explicit option.
 - If there are more students than seats, a prompt offers to add the extra students to the first tables (one seat each, in turn, up to 8 seats) or add new tables of 4. Both can be undone.
