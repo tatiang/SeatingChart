@@ -1,0 +1,20 @@
+{
+  "name": "seating-chart-builder",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "build": "esbuild app.jsx --bundle --outfile=app.js --minify",
+    "test": "node --test tests/*.test.cjs",
+    "check": "npm test && npm run build",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-seating-v2 \"node tests/rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "esbuild": "^0.25.12",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.34.2"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
+  }
+}

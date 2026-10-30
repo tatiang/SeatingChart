@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function ownerAccount() {
+   return request.auth != null
+    && request.auth.token.email_verified == true
+    && request.auth.token.firebase.sign_in_provider == 'google.com'
+    && request.auth.token.email == 'tgreenleaf@markdayschool.org';
+  }
+  match /facultyAccess/{uid} {
+   allow get: if false;
+   allow list, write: if false;
+  }
+  match /users/{uid} {
+   allow read, write: if ownerAccount() && request.auth.uid == uid;
+   match /{document=**} { allow read, write: if ownerAccount() && request.auth.uid == uid; }
+  }
+  match /sharedViews/{id} {
+   allow read: if ownerAccount() && (resource.data.ownerUid == request.auth.uid || resource.data.expiresAt > request.time);
+   allow create: if ownerAccount()
+    && request.resource.data.keys().hasOnly(['ownerUid','expiresAt','chart'])
+    && request.resource.data.ownerUid == request.auth.uid
+    && request.resource.data.expiresAt > request.time
+    && request.resource.data.expiresAt <= request.time + duration.value(7, 'd')
+    && request.resource.data.chart is map
+    && request.resource.data.chart.keys().hasOnly(['name','room','tables','screen','furniture','currentAssignment','students','includeGender']);
+   allow update: if false;
+   allow delete: if ownerAccount() && resource.data.ownerUid == request.auth.uid;
+  }
+  // Retain legacy documents; disable unsafe public snapshots and school-wide notes.
+  match /sharedClasses/{document=**} { allow read, write: if false; }
+  match /schoolNotes/{document=**} { allow read, write: if false; }
+  match /{document=**} { allow read, write: if false; }
+ }
+}
