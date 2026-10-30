@@ -70,3 +70,8 @@ Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Produ
 - `npm run check`: PASS, 30 tests and build. New tests: 60 randomized classes keep each gender and table size within one of even; explicit no-preference mode ignores gender; seat/table shortage helpers.
 - Fictional demo: 25 students on 24 seats opens the prompt; adding the extra student gives the first table 5 seats. Adding tables and the Settings option were covered by tests only, not clicked.
 - A stale cached core.js caused an error during testing; fixed by version-tagging scripts in index.html.
+
+## Room view polish — Oct 30, 2026
+- `npm run check`: PASS, 31 tests and build. One older test hard-coded the previous table size and was updated to the new 236x150 default.
+- Fictional demo, desktop and 375px: names enlarged, no overlap after one Larger tables click. Two clicks overlapped before positions were also scaled; fixed and rechecked with one click only. Print output and real-account appearance not checked.
+- Asset version tag in index.html must be changed on every release (a repeated tag served stale files during testing).
