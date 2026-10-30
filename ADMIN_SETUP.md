@@ -1,23 +1,19 @@
-# Faculty authorization and deployment gate
+# Owner-only deployment
 
-Do not deploy v2 or these rules until the checks below are complete. The production rules currently deployed have not been inspected. The old README recommended public shared-class reads; that recommendation is removed. No production records or rules were changed during implementation.
+Current authorized account: `tgreenleaf@markdayschool.org`, verified Google sign-in only. Firestore enforces the exact email, verified-email claim and Google provider; user documents remain scoped to the authenticated UID. Other accounts are denied even if old Faculty grants exist. No OU or periodic approval job is required. Existing admin allowlist scripts are inactive legacy tooling.
 
-## Administrator actions
+Site URL: https://tatiang.github.io/SeatingChart/ . Pages publishes main at repository root.
 
-1. Export/backup Firestore in `seatingchart-a4cae`; retain the currently deployed rules for rollback review. Inventory `users`, `sharedClasses`, and `schoolNotes`. Existing user documents are retained at `users/{uid}.d`. Never restore publicly readable rules as an automatic rollback.
-2. Have a trusted school administrator approve individual **Faculty** school accounts. Domain membership alone does not establish Faculty status. OU checks and Google Workspace Directory access are not used in this version.
-3. Store the approved list outside the repository and web-serving directory. Set `FACULTY_ALLOWLIST_PATH` to its absolute path. The JSON format is an array of objects with `email` and `approvedUntil` (ISO UTC ending in `Z`). For example, replace the fictional address in `[{"email":"approved.teacher@markdayschool.org","approvedUntil":"2026-11-05T00:00:00Z"}]` with an approved real Faculty account and an appropriate expiration. Approvals cannot extend more than 30 days from execution. No wildcard, personal Gmail account, or domain-wide approval is accepted. An empty list revokes every listed Firebase identity's grant on apply; review the dry-run counts carefully.
-4. Grant a dedicated administrative runtime read-only Firebase Authentication access and Firestore access sufficient to manage `facultyAccess` documents. No domain-wide delegation or Directory API scope is needed. Firebase Admin bypasses rules: keep its credentials private and outside the repository. Run `npm ci --prefix admin`, then set `GOOGLE_APPLICATION_CREDENTIALS` to the external credential file and `FIREBASE_PROJECT_ID=seatingchart-a4cae`. Review `node admin/sync-faculty.mjs` dry-run counts before running `node admin/sync-faculty.mjs --apply`.
-5. Arrange an approved recurring job every 15 minutes. Grants expire after one hour or at the approval expiration, whichever is earlier. Remove departing/non-Faculty users from the list and rerun the verifier; for immediate revocation delete their access grant and remove the approval so it is not renewed. **Workspace suspension/OU changes are not automatically detected.** The verifier checks Firebase disabled status; administrators must maintain the approval list and handle offboarding explicitly. A new teacher must sign in once to create their Firebase Auth identity, then wait for approval synchronization and retry. Job infrastructure and any costs require separate approval.
-6. Install root dev dependencies, run `npm run check` and `npm run test:rules` with Java 21+ available. All emulator tests must pass. Validate real Faculty, student, non-Faculty staff and external test accounts without using real student records.
-7. Coordinate cutover: new rules intentionally deny legacy `sharedClasses` and `schoolNotes` paths. Existing data is not deleted. Teachers must migrate private notes through an administrator-reviewed process; school-wide notes are not automatically copied into private accounts. Old public import links stop working under the new rules. New links are faculty-only, owner-revocable, read-only and expire within seven days.
-8. After PR review and live allowlist verification, deploy rules with `firebase deploy --only firestore:rules --project seatingchart-a4cae`, publish the validated static application on the existing GitHub Pages site, and test both unauthorized reads and authorized save/load. Publish the portfolio card only after authorization is proven live.
+## Deployment sequence
+1. Authenticate Firebase CLI using an account with deployment access to seatingchart-a4cae. The currently connected personal account cannot access this project.
+2. Inspect and retain current deployed rules for rollback review. No data deletion or schema migration is needed.
+3. Run npm run check and the Firestore emulator tests.
+4. Deploy with `npx firebase deploy --only firestore:rules --project seatingchart-a4cae`.
+5. Merge the reviewed feature branch into main, verify Pages build and published assets.
+6. Sign in as tgreenleaf@markdayschool.org, verify existing classes and save/load. Other accounts must be denied. Ensure tatiang.github.io remains an authorized Firebase Auth domain and Google provider is enabled.
 
-## Data and operational limits
+## Current status
+Account-only code and emulator verification prepared. Production rules and Pages have not been updated because Firebase project access is unavailable. Never publish just the frontend restriction as a substitute for server-enforced account-only access.
 
-- Migration is additive and in memory until a teacher edits; unknown fields, IDs, notes and old history remain. The app refuses to save after a failed initial cloud load. No unscoped browser cache is imported into a teacher account.
-- Existing one-document-per-teacher storage remains subject to Firestore's 1 MiB limit. A failed save leaves the page marked unsaved; keep it open and retry. Coordinate multi-device edits: this release retains the legacy last-writer-wins storage model, so simultaneous edits can overwrite each other.
-- The app does not cache student records in localStorage. In-memory demo mode uses fictional records and cannot access cloud data. A teacher's legacy local storage is left untouched for deliberate recovery.
-- Private notes are stored within the teacher's document; public screenshots/tests use synthetic data. No analytics or AI service receives student records. React and Firebase scripts retain the existing external CDN loading pattern.
-- Rules protect stored information even if a malicious client bypasses the UI. No frontend-only domain check grants access. `facultyAccess` is writable only through the privileged verifier.
-- This checkout contains no administrator secrets. Firebase web configuration identifies the existing project and is not an authorization credential.
+## Data limits
+Existing users/{uid}.d documents and unknown migration fields are preserved. Notes stay private; sharing omits notes and now works only for the owner account. One-document Firestore size limit and last-writer-wins multi-device saving still apply. Demo uses fictional in-memory data.

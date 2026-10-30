@@ -1,3 +1,8 @@
+Oct 29, 2026 — 5:04 PM PT — HEAD — Restricted the site to the owner’s Google account
+- Enforced verified Google sign-in for tgreenleaf@markdayschool.org in the app and database rules.
+- Removed the active Faculty grant requirement; other accounts cannot open shared charts.
+- Deployment awaits Firebase project access.
+
 Oct 29, 2026 — 4:57 PM PT — HEAD — Added the Creativity Lab room designer
 - Added six-table landscape layout with a right-side screen, classroom presets, editable room size, table shapes and sizes, snap movement and room objects.
 - Preserved room dimensions in templates, history and shared charts; verified responsive fitting and Undo.

@@ -115,14 +115,14 @@ function App() {
   };
   useEffect(() => {
     if (demo) return;
-    let unsubAccess = () => {}, unsubShare = () => {}, accessTimer, shareTimer;
+    let unsubShare = () => {}, shareTimer;
     const deny = message => {
       session.current++;
       setData(null); setShared(null); setUser(null); setPhase("denied"); setError(message);
     };
     const unsub = fbAuth.onAuthStateChanged(async (u) => {
       const epoch = ++session.current;
-      unsubAccess(); unsubShare(); clearTimeout(accessTimer); clearTimeout(shareTimer);
+      unsubShare(); clearTimeout(shareTimer);
       dirty.current = false;
       past.current = [];
       future.current = [];
@@ -133,10 +133,7 @@ function App() {
       if (!u) return;
       try {
         const token = await u.getIdTokenResult(true);
-        if (!u.emailVerified || !u.email?.toLowerCase().endsWith("@markdayschool.org") || token.signInProvider !== "google.com") throw Error("Use your verified Mark Day School Google account.");
-        const ref = fbDb.collection("facultyAccess").doc(u.uid);
-        const access = await ref.get({ source: "server" });
-        if (!access.exists || access.data().email !== u.email || access.data().expiresAt.toMillis() <= Date.now()) throw Error("Faculty authorization is missing or expired. An administrator must approve your school account on the Faculty allowlist.");
+        if (!u.emailVerified || u.email !== "tgreenleaf@markdayschool.org" || token.signInProvider !== "google.com") throw Error("This site is currently restricted to tgreenleaf@markdayschool.org. Choose that Google account to continue.");
         const snap = await fbDb.collection("users").doc(u.uid).get({ source: "server" });
         if (epoch !== session.current) return;
         const next = snap.exists ? S.migrate(snap.data().d) : S.migrate({ classes: [], activeClassId: null });
@@ -144,11 +141,6 @@ function App() {
         setUser(u);
         setPhase("ready");
         setSync("Saved to cloud");
-        unsubAccess = ref.onSnapshot(a => {
-          clearTimeout(accessTimer);
-          if (!a.exists || a.data().email !== u.email || a.data().expiresAt.toMillis() <= Date.now()) { deny("Faculty access expired or was revoked."); return; }
-          accessTimer = setTimeout(() => deny("Faculty access expired. Sign in again after administrator verification."), a.data().expiresAt.toMillis() - Date.now());
-        }, () => deny("Faculty access could not be verified."));
         const code = new URLSearchParams(location.search).get("share");
         if (code) {
           const ss = await fbDb.collection("sharedViews").doc(code).get({ source: "server" });
@@ -169,7 +161,7 @@ function App() {
     });
     return () => {
       unsub();
-      unsubAccess(); unsubShare(); clearTimeout(accessTimer); clearTimeout(shareTimer);
+      unsubShare(); clearTimeout(shareTimer);
       session.current++;
     };
   }, []);
@@ -317,8 +309,8 @@ function App() {
     window.print();
     document.body.classList.remove("print-gender");
   };
-  if (phase !== "ready") return <main className="login"><div className="login-card"><div className="brand-chair">🪑</div><p className="eyebrow">MARK DAY SCHOOL</p><h1>A place for everyone.</h1><p>Thoughtful classroom layouts.<br />More time for the moments that matter.</p>{phase === "loading" ? <p role="status">Verifying Faculty access…</p> : <><Button className="primary" onClick={() => fbAuth.signInWithPopup(gProvider).then(() => location.reload()).catch((e) => setError(e.message))}>Continue with school Google account</Button><p className="muted">Private · Mark Day Faculty only</p></>}{error && <p role="alert" className="error">{error}</p>}<a href="?demo=1">Explore with fictional students →</a><small>Demo data stays in memory and never connects to student records.</small></div></main>;
-  if (shared) return <main className="shared"><h1>{shared.name}</h1><p>View only · Faculty access required</p><Chart c={shared} prefs={{ ...prefs, showGender: shared.includeGender }} view="grid" readOnly /><button onClick={() => {
+  if (phase !== "ready") return <main className="login"><div className="login-card"><div className="brand-chair">🪑</div><p className="eyebrow">MARK DAY SCHOOL</p><h1>A place for everyone.</h1><p>Thoughtful classroom layouts.<br />More time for the moments that matter.</p>{phase === "loading" ? <p role="status">Verifying your Google account…</p> : <><Button className="primary" onClick={() => fbAuth.signInWithPopup(gProvider).then(() => location.reload()).catch((e) => setError(e.message))}>Continue with school Google account</Button><p className="muted">Private · tgreenleaf@markdayschool.org only</p></>}{error && <p role="alert" className="error">{error}</p>}<a href="?demo=1">Explore with fictional students →</a><small>Demo data stays in memory and never connects to student records.</small></div></main>;
+  if (shared) return <main className="shared"><h1>{shared.name}</h1><p>View only · Your Google account required</p><Chart c={shared} prefs={{ ...prefs, showGender: shared.includeGender }} view="grid" readOnly /><button onClick={() => {
     setShared(null);
     history.replaceState({}, "", location.pathname);
   }}>Back to my classes</button></main>;
@@ -331,7 +323,7 @@ function App() {
  <header className="topbar no-print"><div className="brand"><span className="brand-chair">🪑</span><div><h1>Seating Chart</h1><small>Plan · Arrange · Engage</small></div></div><label className="class-picker"><span className="sr-only">Active class</span><select value={c?.id || ""} onChange={(e) => selectClass(e.target.value)}><option value="" disabled>Choose a class</option>{data.classes.filter((x) => !x.archived).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select><small>2026 – 2027</small></label><nav aria-label="Main navigation">{["Seats", "Students", "History", "Templates", "Settings"].map((name) => <Button key={name} icon={name.toLowerCase()} className={tab === name ? "active" : ""} aria-current={tab === name ? "page" : void 0} onClick={() => {
     setTab(name);
     setDrawer("");
-  }}>{name}</Button>)}</nav><Button icon="help" aria-label="Help" onClick={() => setModal("help")} /><div className="account"><span className="avatar">{demo ? "D" : (user?.displayName || "F")[0]}</span><div><strong>{demo ? "Demo classroom" : user?.displayName || "Faculty"}</strong><small>{demo ? "Fictional students only" : "Faculty \xB7 Mark Day School"}</small></div>{!demo && <button onClick={signOut} aria-label="Sign out">↗</button>}</div></header>
+  }}>{name}</Button>)}</nav><Button icon="help" aria-label="Help" onClick={() => setModal("help")} /><div className="account"><span className="avatar">{demo ? "D" : (user?.displayName || "F")[0]}</span><div><strong>{demo ? "Demo classroom" : user?.displayName || "Faculty"}</strong><small>{demo ? "Fictional students only" : "Private \xB7 Mark Day School"}</small></div>{!demo && <button onClick={signOut} aria-label="Sign out">↗</button>}</div></header>
  <div className="mobile-bar no-print"><button onClick={() => setDrawer(drawer === "classes" ? "" : "classes")}>☰ Classes & tools</button><button onClick={() => setDrawer(drawer === "roster" ? "" : "roster")}>Students ({c?.students.length || 0})</button></div>
  {error && <div className="error-banner no-print" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError("")}>×</button></div>}
  <div className="workspace">
@@ -459,7 +451,7 @@ function App() {
   }} />}
  {modal === "share" && <SharePanel c={c} user={user} demo={demo} includeGender={outputGender} setIncludeGender={setOutputGender} />}
  {modal === "room" && <RoomDesigner c={c} update={update} onApplied={() => {setSelected(null);setZoom(1);setModal(null);}} />}
- {modal === "help" && <div className="help-text"><p>Select a student in the roster, then select a seat. Selecting an occupied seat swaps students. This works with a mouse, touch, or keyboard.</p><p>Drag a table by its header. Select a table and use arrow keys to move it. Use the table controls to rotate, duplicate or delete.</p><p>Use the zoom buttons and scroll the workspace to pan. Undo with ⌘Z or Ctrl+Z; redo with Shift.</p><p>Randomize shows a preview. History preserves saved arrangements. Templates copy only the layout.</p><p>Gender colors start off. Notes stay private. Sharing requires verified Faculty access and expires after seven days.</p>{demo && <p><strong>This demo uses fictional data and does not save changes.</strong></p>}</div>}
+ {modal === "help" && <div className="help-text"><p>Select a student in the roster, then select a seat. Selecting an occupied seat swaps students. This works with a mouse, touch, or keyboard.</p><p>Drag a table by its header. Select a table and use arrow keys to move it. Use the table controls to rotate, duplicate or delete.</p><p>Use the zoom buttons and scroll the workspace to pan. Undo with ⌘Z or Ctrl+Z; redo with Shift.</p><p>Randomize shows a preview. History preserves saved arrangements. Templates copy only the layout.</p><p>Gender colors start off. Notes stay private. Shared links require your Google account and expires after seven days.</p>{demo && <p><strong>This demo uses fictional data and does not save changes.</strong></p>}</div>}
  </Dialog>}
  </div>;
 }
@@ -611,7 +603,7 @@ function SharePanel({ c, user, demo, includeGender, setIncludeGender }) {
   useEffect(() => {
     if (!demo) load();
   }, []);
-  return <div className="dialog-stack"><p>Only verified Mark Day Faculty can open a shared chart. Links expire after seven days and can be revoked here. Notes are never included.</p><label><input type="checkbox" checked={includeGender} onChange={(e) => setIncludeGender(e.target.checked)} /> Include gender in this shared view</label><button className="primary" disabled={demo} onClick={async () => {
+  return <div className="dialog-stack"><p>Only tgreenleaf@markdayschool.org can open a shared chart. Other accounts cannot use these links. Links expire after seven days and can be revoked here. Notes are never included.</p><label><input type="checkbox" checked={includeGender} onChange={(e) => setIncludeGender(e.target.checked)} /> Include gender in this shared view</label><button className="primary" disabled={demo} onClick={async () => {
     try {
       const id = S.id();
       await fbDb.collection("sharedViews").doc(id).set({ ownerUid: user.uid, expiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 7 * 864e5), chart: S.snapshot(c, includeGender) });

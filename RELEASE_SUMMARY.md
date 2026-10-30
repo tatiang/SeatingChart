@@ -22,3 +22,6 @@ OU checks and Directory delegation are deferred at the user’s request. Approva
 New classes start with six tables in two rows and a right-side screen. Existing classes keep their layouts; choose Room designer to apply a preset. Added rows, round pods, horseshoe presets, table shapes/sizes, room size, screen-side controls, snap movement and editable room objects. Layout replacement supports Undo.
 
 SeatPlan reference parity is partial: AI floor-plan import, 3D, meals, live collaboration, amphitheatre, serpentine and U-shaped tables are not implemented. No new dependency or OU integration was added.
+
+## Owner-only rollout supersedes Faculty access
+The active app and rules now require tgreenleaf@markdayschool.org with verified Google authentication. Legacy Faculty grants do not authorize other users. No OU or renewal job is needed. Production rollout is blocked by Firebase project access; Pages remains unchanged.

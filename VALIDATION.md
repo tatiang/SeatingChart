@@ -45,3 +45,6 @@ These checks were deliberately not represented as completed.
 - Select Table 1 → Shape → oval changes the table; Room designer → width 1200 → Resize → Screen right moves the screen; Add room object creates editable Supplies note.
 - Desktop 1440×900 and phone 390×844 visually show six tables and right-side screen. Room fitting now measures both viewport dimensions before paint.
 - Production login/deployment remains outside this local demo verification.
+
+## Owner-only rollout
+`npm run check`: PASS, 14 tests/build. Same Java 21 emulator command above: PASS for exact verified Google owner, rejected other school accounts (including existing Faculty grants), anonymous/external identities, wrong providers and cross-user data access. Firebase apps lookup failed: "Failed to list Firebase apps. See firebase-debug.log for more info." The connected account’s project listing does not include seatingchart-a4cae. No production deployment attempted.
