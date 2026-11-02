@@ -1,3 +1,8 @@
+Nov 2, 2026 — 9:00 AM PT — HEAD — Added door, sliding glass door, window and clock room objects
+- Room designer and Settings can add a Door (with swing), a Sliding glass door, a Window and a Clock, drawn as clear floor-plan symbols with labels you can rename.
+- Doors, windows and sliding doors have wall buttons that snap them flush to the top, right, bottom or left wall and turn them to fit; doors can flip their swing. Windows are drawn with a dashed outline to show they are above floor level.
+- Existing objects, including older doors, windows and clocks, keep working and pick up the new look.
+
 Oct 30, 2026 — 4:10 PM PT — HEAD — Made the Room view larger, clearer and more polished
 - New classes get larger tables, and student names in the Room view are bigger and bolder; empty seats show a clearer "+".
 - Warmer wood floor, softer table shadows and chairs. Printing and exports are unchanged.

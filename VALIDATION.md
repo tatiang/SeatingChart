@@ -75,3 +75,8 @@ Repeated npm run check (14 tests/build) and Java 21 emulator checks: PASS. Produ
 - `npm run check`: PASS, 31 tests and build. One older test hard-coded the previous table size and was updated to the new 236x150 default.
 - Fictional demo, desktop and 375px: names enlarged, no overlap after one Larger tables click. Two clicks overlapped before positions were also scaled; fixed and rechecked with one click only. Print output and real-account appearance not checked.
 - Asset version tag in index.html must be changed on every release (a repeated tag served stale files during testing).
+
+## Room objects — Nov 2, 2026
+- `npm run check`: PASS, 32 tests and build. New test: each new object starts inside the room and every wall placement is flush and in bounds.
+- Fictional demo (desktop): added all four objects; wall buttons moved the door to the right wall and the window to the left; captions stay inside the room. Flip swing, Smaller room sizes, phone width, saved reload and print output not checked.
+- Asset version tag bumped to 20261102b.
