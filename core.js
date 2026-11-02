@@ -23,6 +23,25 @@
     const r=roomSize(c), [w,h]=tableDimensions(c,t), snap=c.room?.snap ? 10 : 1;
     return {...t,x:Math.max(0,Math.min(r.width-w,Math.round(x/snap)*snap)),y:Math.max(0,Math.min(r.height-h,Math.round(y/snap)*snap))};
   }
+  const OBJECTS = { door: { label: "Door", w: 80, h: 80 }, slidingDoor: { label: "Sliding glass door", w: 170, h: 16 }, window: { label: "Window", w: 160, h: 14 }, clock: { label: "Clock", w: 44, h: 44 } };
+  const objectTypes = [["door", "Door"], ["slidingDoor", "Sliding glass door"], ["window", "Window"], ["clock", "Clock"], ["teacherDesk", "Teacher\u2019s desk"], ["plant", "Plant"], ["sink", "Sink"], ["stage", "Stage"], ["storage", "Storage"], ["note", "Note"]];
+  const objectLabel = (f) => f.label && f.label !== f.type ? f.label : OBJECTS[f.type]?.label || (objectTypes.find(([k]) => k === f.type) || [])[1] || f.type;
+  function newObject(type, c, label) {
+    const r = roomSize(c), d = OBJECTS[type];
+    if (!d) return { id: id(), type, label: label || type, x: 30, y: 30, width: type === "stage" ? 200 : 100, height: type === "stage" ? 100 : 50 };
+    const at = { door: [30, 0], slidingDoor: [(r.width - d.w) / 2, r.height - d.h], window: [(r.width - d.w) / 2, 0], clock: [(r.width - d.w) / 2, 14] }[type];
+    return { id: id(), type, label: label || d.label, x: Math.round(at[0]), y: Math.round(at[1]), width: d.w, height: d.h, rot: 0 };
+  }
+  function placeOnWall(c, f, side) {
+    const r = roomSize(c), d = OBJECTS[f.type];
+    const long = Math.max(f.width || d.w, f.height || d.h), thick = Math.min(f.width || d.w, f.height || d.h), clamp = (v, max) => Math.max(0, Math.min(max, Math.round(v)));
+    if (f.type === "door") {
+      const s = thick, rot = { top: 0, right: 90, bottom: 180, left: 270 }[side];
+      return { ...f, width: s, height: s, rot, x: side === "left" ? 0 : side === "right" ? r.width - s : clamp(f.x, r.width - s), y: side === "top" ? 0 : side === "bottom" ? r.height - s : clamp(f.y, r.height - s) };
+    }
+    const vertical = side === "left" || side === "right", width = vertical ? thick : long, height = vertical ? long : thick;
+    return { ...f, width, height, x: side === "left" ? 0 : side === "right" ? r.width - width : clamp(f.x, r.width - width), y: side === "top" ? 0 : side === "bottom" ? r.height - height : clamp(f.y, r.height - height) };
+  }
   function scaleTables(c, factor) {
     const cx = c.tables.length ? c.tables.reduce((n, t) => n + t.x, 0) / c.tables.length : 0, cy = c.tables.length ? c.tables.reduce((n, t) => n + t.y, 0) / c.tables.length : 0;
     const tables = c.tables.map((t) => {
@@ -211,7 +230,7 @@
   function snapshot(c, includeGender = false) {
     return { name: c.name, room: clone(roomSize(c)), tables: clone(c.tables), screen: clone(c.screen), furniture: clone(c.furniture || []), currentAssignment: clone(c.currentAssignment || {}), students: c.students.map((s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, preferredName: s.preferredName || "", name: s.name, ...includeGender ? { gender: s.gender || "" } : {} })), includeGender };
   }
-  const api = { roomSize, tableDimensions, boundTable, scaleTables, layoutPreset, clone, id, colors, shortage, addSeats, addTables, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
+  const api = { roomSize, tableDimensions, boundTable, scaleTables, OBJECTS, objectTypes, objectLabel, newObject, placeOnWall, layoutPreset, clone, id, colors, shortage, addSeats, addTables, student, migrate, makeClass, display, locate, assign, randomize, csv, parseCSV, importCSV, snapshot };
   if (typeof module !== "undefined") module.exports = api;
   else root.Seating = api;
 })(globalThis);

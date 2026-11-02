@@ -31,3 +31,12 @@
 .room-surface .whiteboard{font-size:12px;border-radius:6px}
 .room-surface .room-plant{font-size:46px}
 }
+@media screen{
+.furniture.obj{display:block;overflow:visible;background:none;border-radius:0;z-index:1}
+.furniture.obj svg{display:block}
+.obj-caption{position:absolute;font-size:12px;font-weight:600;color:#6b4d28;white-space:nowrap;text-shadow:0 1px 0 #fff8;pointer-events:none}
+.cap-top{left:50%;top:100%;transform:translateX(-50%);margin-top:3px}
+.cap-bottom{left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:3px}
+.cap-left{left:100%;top:50%;transform:translateY(-50%);margin-left:5px}
+.cap-right{right:100%;top:50%;transform:translateY(-50%);margin-right:5px}
+}
